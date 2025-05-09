@@ -9,6 +9,8 @@ import numpy as np
 from pathlib import Path
 from typing import List
 from utils.config_utils import (
+    TrajectoryReaderType,
+    TrajectoryWriterType,
     TrajectoryReaderConfig
 )
 
@@ -159,10 +161,10 @@ class TrajectoryReader_NULL(TrajectoryReader):
 
 
 trajectory_reader_available = {
-    "kitti": TrajectoryReader_KITTI,
-    "tum": TrajectoryReader_TUM,
-    "vilens": TrajectoryReader_VILENS,
-    "null": TrajectoryReader_NULL
+    TrajectoryReaderType.kitti: TrajectoryReader_KITTI,
+    TrajectoryReaderType.tum: TrajectoryReader_TUM,
+    TrajectoryReaderType.vilens: TrajectoryReader_VILENS,
+    TrajectoryReaderType.null: TrajectoryReader_NULL
 }
 
 
@@ -226,6 +228,6 @@ class TrajectoryWriter_KITTI:
 
 
 trajectory_writer_available = {
-    "tum": TrajectoryWriter_TUM,
-    "kitti": TrajectoryWriter_KITTI
+    TrajectoryWriterType.tum: TrajectoryWriter_TUM,
+    TrajectoryWriterType.kitti: TrajectoryWriter_KITTI
 }

@@ -16,11 +16,12 @@ class TrackingMethod(str, Enum):
 
 
 class DatasetType(str, Enum):
-    custom = "custom"
+    generic = "generic"
     vbr = "vbr"
     kitti = "kitti"
     ncd = "ncd"
     oxspires = "oxspires"
+    oxspires_vilens = "oxspires_vilens"
 
 
 class TrajectoryReaderType(str, Enum):
@@ -124,10 +125,19 @@ class OutputConfig:
 
 @dataclass
 class PreprocessingConfig:
+    """
+    As mentioned in the paper, with depth, we really refer to
+    point's ranges (norm([x,y,z]).
+    """
+    # Internal LiDAR image height (typically equal to vertical beams)
     image_height: int = 0
+    # Internal LiDAR image width (typically equal to horizontal samples)
     image_width: int = 0
+    # Minimum valid range
     depth_min: float = 0.0
+    # Maximum valid range
     depth_max: float = 1e6
+    enable_normal_estimation: Optional[bool] = True
     enable_ground_segmentation: Optional[bool] = True
 
 
@@ -140,6 +150,8 @@ class OptimizationConfig:
 class Configuration:
     inherit_from: Optional[str] = None
     data: DatasetConfig = field(default_factory=DatasetConfig)
+    preprocessing: PreprocessingConfig = field(
+        default_factory=PreprocessingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     mapping: MappingConfig = field(default_factory=MappingConfig)

@@ -3,7 +3,7 @@ import re
 from utils.logging_utils import get_logger
 import natsort
 from pathlib import Path
-from utils.config_utils import PointCloudReaderConfig
+from utils.config_utils import PointCloudReaderConfig, PointCloudReaderType
 import open3d as o3d
 from rosbags.highlevel import AnyReader
 import sys
@@ -176,10 +176,10 @@ class PointCloudReader_ROSBAG(PointCloudReader):
 
 
 pointcloud_reader_available = {
-    "bin": PointCloudReader_BIN,
-    "ply": PointCloudReader_PLY,
-    "pcd": PointCloudReader_PCD,
-    "rosbag": PointCloudReader_ROSBAG
+    PointCloudReaderType.bin: PointCloudReader_BIN,
+    PointCloudReaderType.ply: PointCloudReader_PLY,
+    PointCloudReaderType.pcd: PointCloudReader_PCD,
+    PointCloudReaderType.rosbag: PointCloudReader_ROSBAG
 }
 
 

@@ -1,11 +1,12 @@
+from utils.pointcloud_utils import pointcloud_reader_available
+from utils.trajectory_utils import trajectory_reader_available
 from pathlib import Path
 from utils.config_utils import (
-    DatasetConfig, DatasetType, Configuration)
+    Configuration, DatasetType)
 from utils.pointcloud_utils import (
     PointCloudReader,
     PointCloudReader_BIN,
     PointCloudReader_PCD,
-    PointCloudReader_PLY,
     PointCloudReader_ROSBAG
 )
 from utils.trajectory_utils import (
@@ -238,3 +239,43 @@ class DatasetReader_OXSPIRES_VILENS(DatasetReader):
 
     def __iter__(self):
         return self
+
+
+class DatasetReader_GENERIC(DatasetReader):
+    """
+    Generic Reader for non-registered datasets.
+    This class allows to mix any point cloud readers with any trajectory
+    reader.
+    For additional information, refer to the appropriate classes.
+
+    When queried, the reader returns a tuple containing:
+        (cloud, timestamp, associated_gt_pose)
+    """
+
+    def __init__(self, config: Configuration):
+        DatasetReader.__init__(self, config)
+        pc_cfg = config.data.cloud_reader
+        tr_cfg = config.data.trajectory_reader
+
+        self.cloud_reader = pointcloud_reader_available[pc_cfg.bin_format](
+            pc_cfg)
+        self.traj_reader = trajectory_reader_available[tr_cfg.reader_type](
+            tr_cfg)
+
+    def __iter__(self):
+        return self
+
+
+datasetreader_available = {
+    DatasetType.vbr: DatasetReader_VBR,
+    DatasetType.kitti: DatasetReader_KITTI,
+    DatasetType.ncd: DatasetReader_NCD,
+    DatasetType.oxspires: DatasetReader_OXSPIRES,
+    DatasetType.oxspires_vilens: DatasetReader_OXSPIRES_VILENS,
+    DatasetType.generic: DatasetReader_GENERIC
+}
+
+
+def get_dataset_reader(config: Configuration) -> DatasetReader:
+    dr_type = config.data.dataset_type
+    return datasetreader_available[dr_type](config)

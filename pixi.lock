@@ -103,6 +103,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8a/0b/9fcc47d19c48b59121088dd6da2488a49d5f72dacf8262e2790a1d2c7d15/pygments-2.19.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/05/e7/df2285f3d08fee213f2d041540fa4fc9ca6c2d44cf36d3a035bf2a8d2bcc/pyparsing-3.2.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/92/7b/04bf02177541c33294ffbbc64c29a99c596f33562593c29c6f690e844873/pyprojections-0.0.3.tar.gz
       - pypi: https://files.pythonhosted.org/packages/49/b3/d8482e8cacc8ea15a356efea13d22ce1c5914a9ee36622ba250523240bf2/pyquaternion-0.9.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/59/5d/46b9421f18de28612617cfbfefddab3419ade99e66416a95af27fef3b27a/pytransform3d-3.14.0.tar.gz
@@ -1456,6 +1457,12 @@ packages:
   - railroad-diagrams ; extra == 'diagrams'
   - jinja2 ; extra == 'diagrams'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/92/7b/04bf02177541c33294ffbbc64c29a99c596f33562593c29c6f690e844873/pyprojections-0.0.3.tar.gz
+  name: pyprojections
+  version: 0.0.3
+  sha256: 6b0dfea21b2f2d3bdb1a7e7cff93a70accda67ca1086cd6145313a297d4e1956
+  requires_dist:
+  - numpy
 - pypi: https://files.pythonhosted.org/packages/49/b3/d8482e8cacc8ea15a356efea13d22ce1c5914a9ee36622ba250523240bf2/pyquaternion-0.9.9-py3-none-any.whl
   name: pyquaternion
   version: 0.9.9
