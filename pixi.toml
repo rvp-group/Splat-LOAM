@@ -7,6 +7,9 @@ platforms = ["linux-64"]
 
 [tasks]
 
+[system-requirements]
+libc = "2.31" # Minimum required version for Open3d
+
 [dependencies]
 python = ">=3.11,<3.13"
 
@@ -15,4 +18,9 @@ python = ">=3.11,<3.13"
 omegaconf = ">=2.3.0, <3"
 torch = {version = ">=2.5.1", index = "https://download.pytorch.org/whl/cu118"}
 torchvision = {version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu118"}
+pytransform3d = ">=3.14.0, <4"
+open3d = "==0.19"
+rosbags = ">=0.10.9, <0.11"
+natsort = ">=8.4.0, <9"
+typer = ">=0.15.3, <0.16"
 
