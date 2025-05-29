@@ -1,0 +1,6 @@
+[submodule "submodules/diff-surfel-spherical-rasterization"]
+	path = submodules/diff-surfel-spherical-rasterization
+	url = git@github.com:rvp-group/diff-surfel-spherical-rasterization.git
+[submodule "submodules/simple-knn"]
+	path = submodules/simple-knn
+	url = https://gitlab.inria.fr/bkerbl/simple-knn.git

@@ -60,8 +60,9 @@ def eval_trajectory(estimate_filename: Path, reference_filename: Path,
 @app.command("eval_mapping",
              short_help="Evaluate the mapping metrics "
              "(Accuracy, Completeness, Charmfer-L1, F1-score) "
-             "of an estimated mesh against the reference point cloud.")
-def eval_mapping(estimate_filename: Path, reference_filename: Path,
+             "of one or more estimated mesh against the reference point "
+             "cloud.")
+def eval_mapping(estimate_filename: list[Path], reference_filename: Path,
                  output_filename: Path):
     logger.error("Not implemented yet!")
     ...

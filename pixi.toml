@@ -12,6 +12,7 @@ libc = "2.31" # Minimum required version for Open3d
 
 [dependencies]
 python = ">=3.11,<3.13"
+pip = ">=25.1.1,<26"
 
 
 [pypi-dependencies]
@@ -24,4 +25,5 @@ rosbags = ">=0.10.9, <0.11"
 natsort = ">=8.4.0, <9"
 typer = ">=0.15.3, <0.16"
 pyprojections = ">=0.0.3, <0.0.4"
+setuptools = "*"
 

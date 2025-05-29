@@ -9,10 +9,10 @@ logger = get_logger("")
 
 
 class TrackingMethod(str, Enum):
-    GT = "gt"
-    POINT_TO_POINT = "p2point"
-    POINT_TO_PLANE = "p2plane"
-    GSALIGNER = "gsaligner"
+    gt = "gt"
+    p2point = "p2point"
+    p2plane = "p2plane"
+    gsaligner = "gsaligner"
 
 
 class DatasetType(str, Enum):
@@ -80,7 +80,7 @@ class PointCloudReaderConfig:
 @dataclass
 class TrackingConfig:
     num_iterations: int = 10
-    method: TrackingMethod = TrackingMethod.GSALIGNER
+    method: TrackingMethod = TrackingMethod.gsaligner
     keyframe_threshold_distance: float = 1.0
     keyframe_threshold_nframes: int = -1
     keyframe_threshold_fitness: float = -1.0
@@ -99,6 +99,12 @@ class MappingConfig:
     early_stop_enable: Optional[bool] = True
     early_stop_patience: Optional[int] = 100
     early_stop_threshold: Optional[float] = 0.01
+    opt_lambda_alpha: float = 1e-1
+    opt_lambda_normal: float = 1e-1
+    # Maximum per-axis scaling value
+    opt_scaling_max: float = 0.5
+    # Penalty for higher scaling factors
+    opt_scaling_max_penalty: float = 0.2
 
 
 @dataclass
@@ -108,7 +114,7 @@ class LoggingConfig:
 
 @dataclass
 class DatasetConfig:
-    dataset_type: DatasetType = DatasetType.custom
+    dataset_type: DatasetType = DatasetType.generic
     trajectory_reader: Optional[TrajectoryReaderConfig] = \
         field(default_factory=TrajectoryReaderConfig)
     cloud_reader: Optional[PointCloudReaderConfig] = \
@@ -143,6 +149,10 @@ class PreprocessingConfig:
 
 @dataclass
 class OptimizationConfig:
+    position_lr: float = 0.0005
+    opacity_lr: float = 0.05
+    scaling_lr: float = 0.005
+    rotation_lr: float = 0.001
     ...
 
 
@@ -176,8 +186,8 @@ def load_configuration(filename: Path, cli_args: list[str] = None) -> \
     default_cfg = OmegaConf.structured(Configuration)
     derived_cfg = OmegaConf.load(filename)
     if derived_cfg.get("inherit_from") is not None:
-        logger.debug(f"Recursively loading configuration from {
-                     derived_cfg.get('inherit_from')}")
+        logger.debug(f"Recursively loading configuration from "
+                     f"{derived_cfg.get('inherit_from')}")
         base_cfg = load_configuration(derived_cfg["inherit_from"])
         cfg = OmegaConf.merge(default_cfg, base_cfg, derived_cfg)
     else:
