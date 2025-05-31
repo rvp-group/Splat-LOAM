@@ -23,6 +23,11 @@ COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/pytho
 RUN groupadd -g $GID $UNAME
 RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
 
+RUN apt update && apt install --no-install-recommends -y \
+  libgl1 \
+  libgomp1 \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN pip install rosbags typer[all] omegaconf matplotlib pytransform3d \
     plyfile natsort open3d rerun-sdk evo pyprojections
 

@@ -194,8 +194,8 @@ class TrajectoryWriter_TUM:
                 )
             )
             f.write(
-                f"{timestamp:.6f} {pq[0]:.4f} {pq[1]:.4f} {
-                    pq[2]:.4f} {pq[4]} {pq[5]} {pq[6]} {pq[3]}\n"
+                f"{timestamp:.6f} {pq[0]:.4f} {pq[1]:.4f} "
+                f"{pq[2]:.4f} {pq[4]} {pq[5]} {pq[6]} {pq[3]}\n"
             )
 
 

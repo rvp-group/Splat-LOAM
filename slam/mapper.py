@@ -15,7 +15,6 @@ class Mapper:
         Change internal reference to the active local model
         """
         self.model = model
-        ...
         return
 
     def update_model(self, frame: Frame) -> None:
@@ -30,9 +29,9 @@ class Mapper:
         return
 
     def densify(self, frame: Frame) -> None:
-        ...
+        raise RuntimeError("Not implemented yet!")
         return
 
     def optimize(self) -> None:
-        ...
+        raise RuntimeError("Not implemented yet!")
         return

@@ -37,7 +37,7 @@ class PointCloudReader_Collections(PointCloudReader):
     """
 
     def __init__(self, config: PointCloudReaderConfig):
-        PointCloudReaderConfig.__init__(self, config)
+        PointCloudReader.__init__(self, config)
         if config.timestamp_filename is not None:
             # Reads timestamps from a file
             self.timestamps = read_timestamps(config.timestamp_filename)
@@ -157,8 +157,8 @@ class PointCloudReader_ROSBAG(PointCloudReader):
             x for x in self.bag.connections if x.topic == config.rosbag_topic]
         if len(connections) == 0:
             avail_topics = {x.topic for x in self.bag.connections}
-            logger.error(f"Topic {config.rosbag_topic} not available in {
-                         avail_topics}")
+            logger.error(f"Topic {config.rosbag_topic} not available"
+                         f"in {avail_topics}")
         self.n_clouds = self.bag.topics[config.rosbag_topic].msgcount
         self.cloud_loader = self.bag.messages(connections=connections)
 

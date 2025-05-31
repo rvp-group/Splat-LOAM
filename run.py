@@ -1,12 +1,18 @@
 import typer
 from pathlib import Path
-from utils.config_utils import load_configuration
+from utils.config_utils import (
+    load_configuration, Configuration, save_configuration)
 from utils.logging_utils import get_logger, set_log_level
 from typing_extensions import Annotated
+from slam.slam import SLAM
+from scene.dataset_readers import get_dataset_reader
+from scene.preprocessing import Preprocessor
+from rich.progress import track
 
 app = typer.Typer()
 
 logger = get_logger("main")
+set_log_level(0)
 
 
 @app.command("slam",
@@ -36,7 +42,15 @@ def slam_main(ctx: typer.Context,
     logger.info("Running SLAM mode")
     cfg = load_configuration(configuration, ctx.args)
     logger.info(f"Running experiment with configuration:\n{cfg}")
-    logger.error("Not implemented yet!")
+    data_loader = get_dataset_reader(cfg)
+    preprocessor = Preprocessor(cfg)
+    slam_module = SLAM(cfg)
+    for cloud, timestamp, pose in track(data_loader,
+                                        description="Processing frames"):
+        frame = preprocessor(cloud, timestamp, pose)
+        slam_module.process(frame)
+
+    raise NotImplementedError("Not yet done!")
     ...
 
 
@@ -44,7 +58,7 @@ def slam_main(ctx: typer.Context,
              short_help="Generate a mesh of the environment from the "
              "SLAM output")
 def mesh_main(input_model: Path, output_filename: Path):
-    logger.error("Not implemented yet!")
+    raise NotImplementedError("Not yet done!")
     ...
 
 
@@ -53,7 +67,7 @@ def mesh_main(input_model: Path, output_filename: Path):
              "against the reference.")
 def eval_trajectory(estimate_filename: Path, reference_filename: Path,
                     output_filename: Path):
-    logger.error("Not implemented yet!")
+    raise NotImplementedError("Not yet done!")
     ...
 
 
@@ -64,7 +78,7 @@ def eval_trajectory(estimate_filename: Path, reference_filename: Path,
              "cloud.")
 def eval_mapping(estimate_filename: list[Path], reference_filename: Path,
                  output_filename: Path):
-    logger.error("Not implemented yet!")
+    raise NotImplementedError("Not yet done!")
     ...
 
 
@@ -74,8 +88,18 @@ def eval_mapping(estimate_filename: list[Path], reference_filename: Path,
 def crop_intersection(estimate_filenames: list[Path],
                       reference_filename: Path,
                       output_filename: Path):
-    logger.error("Not implemented yet!")
+    raise NotImplementedError("Not yet done!")
     ...
+
+
+@app.command("generate_dummy_cfg",
+             short_help="Generate a configuration file in yaml format "
+             "with default parameters setup")
+def generate_dummy_cfg(output_filename: Path):
+    cfg = Configuration()
+    logger.info(f"Default cfg: {cfg}")
+    logger.info(f"Saved at {output_filename}")
+    save_configuration(output_filename, cfg)
 
 
 if __name__ == "__main__":

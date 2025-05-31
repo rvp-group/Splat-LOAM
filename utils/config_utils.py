@@ -167,6 +167,7 @@ class Configuration:
     mapping: MappingConfig = field(default_factory=MappingConfig)
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     opt: OptimizationConfig = field(default_factory=OptimizationConfig)
+    device: str = "cuda:0"
 
 
 def load_configuration(filename: Path, cli_args: list[str] = None) -> \

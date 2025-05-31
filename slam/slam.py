@@ -13,18 +13,15 @@ class SLAM:
         self.tracker = Tracker(cfg)
         self.local_models: list[LocalModel] = []
         self.frames = []
-        ...
 
-    def process(self,
-                frame: Frame,
-                timestamp: float):
+    def process(self, frame: Frame) -> None:
         # Initialize the system.
         if len(self.frames) == 0:
             self.initialize_new_local_model(frame)
             return
 
         # Tracking
-        self.tracker.track(frame, timestamp)
+        self.tracker.track(frame)
 
         # Update keyframe if needed
         if self.tracker.require_new_keyframe():

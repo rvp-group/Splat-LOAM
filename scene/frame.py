@@ -3,8 +3,9 @@ from scene.cameras import Camera
 
 
 class Frame:
-    def _init__(self, camera: Camera, device: str):
+    def __init__(self, camera: Camera, timestamp: float, device: str):
         self.camera = camera
+        self.timestamp = timestamp
         self.model_T_cam = torch.eye(4, dtype=torch.float32,
                                      device=device)
 

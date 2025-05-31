@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 from utils.logging_utils import get_logger
+from utils.graphic_utils import getWorld2View2
 
 logger = get_logger("")
 
@@ -39,5 +40,11 @@ class Camera(nn.Module):
 
         self.image_width = self.image_depth.shape[2]
         self.image_height = self.image_depth.shape[1]
-
-        ...
+        self.world_view_transform = torch.tensor(
+            getWorld2View2(world_T_lidar[:3, :3],
+                           world_T_lidar[:3, -1]))\
+            .transpose(0, 1).to(data_device)
+        K = torch.from_numpy(K).float().to(data_device)
+        self.projection_matrix = torch.eye(4, dtype=torch.float32,
+                                           device=data_device)
+        self.projection_matrix[:3, :3] = K.transpose(0, 1)

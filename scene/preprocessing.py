@@ -2,6 +2,8 @@ import numpy as np
 import open3d as o3d
 from utils.config_utils import Configuration
 from utils.logging_utils import get_logger
+from scene.cameras import Camera
+from scene.frame import Frame
 import pyprojections as pyp
 
 
@@ -15,12 +17,14 @@ class Preprocessor:
     by Splat-LOAM.
     """
 
-    def __init__(self, config: Configuration):
-        self.cfg = config.preprocessing
+    def __init__(self, cfg: Configuration):
+        self.device = cfg.device
+        self.cfg = cfg.preprocessing
 
     def __call__(self,
                  cloud: np.ndarray,
-                 gt_pose: np.ndarray):
+                 timestamp: float,
+                 gt_pose: np.ndarray) -> Frame:
         """
         The function completes the following steps:
         - Compute the optimal cloud intrinsics.
@@ -40,8 +44,7 @@ class Preprocessor:
             self.cfg.depth_max,
             pyp.CameraModel.Spherical
         )
-
-        lut, _ = projector.project(cloud)
+        lut, _ = projector.project(cloud.T)
         invalid_mask = lut == -1
         valid_image = ~invalid_mask
         ranges = np.linalg.norm(cloud, axis=1)
@@ -54,8 +57,16 @@ class Preprocessor:
         normals_image = normals[lut]
         normals_image[invalid_mask] = np.float32([0, 0, 0])
 
-        logger.error("Not implemented yet!")
-        # TODO: return a CameraInfo object (maybe we can prune this for speed)
+        camera = Camera(
+            K=K,
+            image_depth=range_image[None, ...],
+            image_normal=normals_image.transpose(2, 0, 1),
+            image_valid=valid_image[None, ...],
+            world_T_lidar=gt_pose)
+        return Frame(
+            camera=camera,
+            timestamp=timestamp,
+            device=self.device)
 
     def compute_normals(self, cloud: np.ndarray) -> np.ndarray:
         """
@@ -83,9 +94,10 @@ class Preprocessor:
             pcd.orient_normals_towards_camera_location()
             normals = np.asarray(pcd.normals)
         else:
-            normals = -cloud / np.linalg.norm(cloud, axis=1)
+            normals = -cloud / np.linalg.norm(cloud, axis=1)[..., None]
 
         if self.cfg.enable_ground_segmentation:
             # TODO: Implement ground segmentation via patchworkpp
-            ...
+            raise NotImplementedError(
+                "Ground segmentation still not implemented")
         return normals
