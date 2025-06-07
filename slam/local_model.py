@@ -10,6 +10,7 @@ class LocalModel:
         self.keyframes = []
         self.world_T_model = torch.eye(4)
         self.model = GaussianModel(self.cfg.device)
+        self.model.training_setup(cfg)
 
     def insert_keyframe(self, frame: Frame) -> None:
         self.keyframes.append(frame)
@@ -22,3 +23,7 @@ class LocalModel:
         """
         ...
         return False
+
+    @property
+    def get_gmodel(self):
+        return self.model

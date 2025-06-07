@@ -32,6 +32,6 @@ def set_log_level(verbosity: bool):
     else:
         level = logging.INFO
 
-    for name in logging.root.manager.loggerDict:
-        logging.getLogger(name).setLevel(level)
+    # for name in logging.root.manager.loggerDict:
+    #     logging.getLogger(name).setLevel(level)
     logging.getLogger().setLevel(level)

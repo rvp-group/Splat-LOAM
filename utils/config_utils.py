@@ -153,7 +153,11 @@ class OptimizationConfig:
     opacity_lr: float = 0.05
     scaling_lr: float = 0.005
     rotation_lr: float = 0.001
-    ...
+    # depth_ratio indicates whether expected or median
+    # depth should be rasterized
+    # 0 -> expected
+    # 1 -> median
+    depth_ratio: float = 0
 
 
 @dataclass

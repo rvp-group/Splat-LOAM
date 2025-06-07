@@ -49,7 +49,7 @@ def render(
             "visibility_filter": radii > 0,
             "radii": radii}
     render_alpha = allmap[1:2]
-    mask = render_alpha > 0.0
+    mask = (render_alpha > 0.0).squeeze(0)
 
     # Get Normal map
     render_normal = allmap[2:5]
@@ -58,17 +58,19 @@ def render(
         render_normal.permute(1, 2, 0) @
         camera.world_view_transform[:3, :3].T
     ).permute(2, 0, 1)
+    render_normal[..., mask] = render_normal[..., mask] / \
+        render_alpha[..., mask]
 
     # Get Median depth
     render_depth_median = allmap[5:6]
-    render_depth_median = torch.nan_to_num(render_depth_median, 0, 0)
+    # render_depth_median = torch.nan_to_num(render_depth_median, 0, 0)
 
     # Get Expected depth
     render_depth_expected = allmap[0:1]
-    render_depth_expected[mask] = render_depth_expected[mask] / \
-        render_alpha[mask]
+    render_depth_expected[..., mask] = render_depth_expected[..., mask] / \
+        render_alpha[..., mask]
     # In theory useless
-    render_depth_expected = torch.nan_to_num(render_depth_expected, 0, 0)
+    # render_depth_expected = torch.nan_to_num(render_depth_expected, 0, 0)
 
     # Get distortion map
     rend_dist = allmap[6:7]
@@ -77,8 +79,7 @@ def render(
         render_depth_median * depth_ratio
 
     surf_normal = depth_to_normal(camera, surf_depth)
-    surf_normal = surf_normal.permute(2, 0, 1) * \
-        render_alpha
+    # surf_normal[..., mask] = surf_normal[..., mask] / render_alpha[..., mask]
     rets.update(
         {
             "rend_alpha": render_alpha,

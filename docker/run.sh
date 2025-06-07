@@ -15,7 +15,8 @@ IMAGE_NAME=splatloam
 
 xhost +
 
-docker run --gpus 'all,"capabilities=compute,utility,graphics"' \
+docker run --gpus 'all' \
+  -e NVIDIA_DRIVER_CAPABILITIES=all \
   -ti \
   -it \
   --rm \

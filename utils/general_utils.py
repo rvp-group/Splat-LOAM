@@ -1,5 +1,5 @@
 import torch
-import torch.functional as F
+import torch.nn.functional as F
 
 
 def build_rotation(r: torch.Tensor) -> torch.Tensor:

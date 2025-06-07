@@ -10,7 +10,8 @@ class BasicPointCloud(NamedTuple):
 
 def getWorld2View2(R, t, translate=np.array([0.0, 0.0, 0.0]), scale=1.0):
     Rt = np.zeros((4, 4))
-    Rt[:3, :3] = R.transpose()
+    # Rt[:3, :3] = R.transpose()
+    Rt[:3, :3] = R
     Rt[:3, 3] = t
     Rt[3, 3] = 1.0
 
@@ -77,6 +78,25 @@ def depth_to_normal(camera,
                     points[..., :-2, 1:-1]], dim=0)
     dy = torch.cat([points[..., 1:-1, 2:] -
                     points[..., 1:-1, :-2]], dim=1)
-    normals = torch.nn.functional.normalize(torch.cross(dx, dy, dim=0))
+    normals = torch.nn.functional.normalize(
+        torch.cross(dx, dy, dim=0), dim=0)
     res[..., 1:-1, 1:-1] = normals
+    return res
+
+
+def compute_depth_gradient(depth: torch.Tensor,
+                           valid_mask: torch.Tensor) -> torch.Tensor:
+    # use log of depth to highlight local changes in depth
+    depth = torch.nan_to_num(torch.log(depth), nan=0, posinf=0, neginf=0)
+    res = torch.zeros_like(depth)
+    dx = torch.cat([depth[..., 2:, 1:-1] -
+                    depth[..., :-2, 1:-1]], dim=0)
+    dx_mask = valid_mask[..., 2:, 1:-1] & valid_mask[..., :-2, 1:-1]
+    dx = dx * dx_mask
+    dy = torch.cat([depth[..., 1:-1, 2:] -
+                    depth[..., 1:-1, :-2]], dim=1)
+    dy_mask = valid_mask[..., 1:-1, 2:] & valid_mask[..., 1:-1, :-2]
+    dy = dy * dy_mask
+    grad = torch.sqrt(dx ** 2 + dy ** 2)
+    res[..., 1:-1, 1:-1] = grad
     return res

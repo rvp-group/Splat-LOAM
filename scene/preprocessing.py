@@ -32,9 +32,14 @@ class Preprocessor:
         - [Optionally] Segment ground points
         - [Optionally] Compute normals
         - Yield results in the form of a CameraInfo object.
+
+        Args:
+            cloud: [N, 3] np.float32 array
+            timestamp: float
+            gt_pose: [4, 4] np.float32 array
         """
         K, _, vfov, hfov = pyp.calculate_spherical_intrinsics(
-            cloud, self.cfg.image_height, self.cfg.image_width
+            cloud.T, self.cfg.image_height, self.cfg.image_width
         )
         projector = pyp.Camera(
             self.cfg.image_height,

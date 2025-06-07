@@ -8,6 +8,9 @@ from slam.slam import SLAM
 from scene.dataset_readers import get_dataset_reader
 from scene.preprocessing import Preprocessor
 from rich.progress import track
+import torch
+import rerun as rr
+
 
 app = typer.Typer()
 
@@ -38,6 +41,8 @@ def slam_main(ctx: typer.Context,
               configuration: Path,
               verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False
               ):
+    rr.init("SplatLOAM")
+    rr.serve_web(open_browser=False)
     set_log_level(verbose)
     logger.info("Running SLAM mode")
     cfg = load_configuration(configuration, ctx.args)
