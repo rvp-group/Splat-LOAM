@@ -39,6 +39,7 @@ class Mapper:
         """
         self.densify(frame, initialize_model)
         self.optimize()
+        self.prune()
         return
 
     @torch.no_grad()
@@ -75,7 +76,7 @@ class Mapper:
         no_samples = int(self.cfg.mapping.densify_percentage *
                          candidates.shape[0])
         # No densification can occurr here
-        if no_samples == 0:
+        if no_samples < 2:
             return
 
         depth_gradient = compute_depth_gradient(
@@ -135,9 +136,11 @@ class Mapper:
     def optimize(self) -> None:
         loss_ema = None
         loss_ema_alpha = 0.1
+        torch.autograd.set_detect_anomaly(True)
         for iter in range(self.cfg.mapping.num_iterations + 1):
-            # keyframe = samplers.sample_uniform(self.model.keyframes)
-            keyframe = self.model.keyframes[-1]
+            self.model.get_gmodel.optimizer.zero_grad(set_to_none=True)
+            keyframe = samplers.sample_uniform(self.model.keyframes)
+            # keyframe = self.model.keyframes[-1]
             render_pkg = render(keyframe.camera,
                                 self.model.get_gmodel,
                                 self.cfg.opt.depth_ratio)
@@ -153,32 +156,36 @@ class Mapper:
             valid_mask = gt_alpha[0] == 1.0
 
             geom_l1 = torch.abs(valid_mask * (
-                gt_depth - est_depth)).mean()
+                est_depth - gt_depth)).mean()
             # Eq (15)
             normal_loss = (1 - (
                 est_normal[..., valid_mask] * surf_normal[..., valid_mask]
             ).sum(dim=0)).mean()
+            normal_loss *= self.cfg.mapping.opt_lambda_normal
             # Eq (16)
             alpha_loss = torch.nn.functional.binary_cross_entropy(
                 est_alpha[..., valid_mask],
                 gt_alpha[..., valid_mask].float(),
                 reduction="mean"
             )
+            alpha_loss *= self.cfg.mapping.opt_lambda_alpha
 
             # Eq (17)
-            scales, _ = self.model.get_gmodel.get_scaling.max(dim=1)
-            scaling_max = self.cfg.mapping.opt_scaling_max
-            reg_scaling = scales[scales >= scaling_max] - scaling_max
-            reg_scaling = reg_scaling.sum() * \
-                self.cfg.mapping.opt_scaling_max_penalty
+            scales_max = self.model.get_gmodel.get_scaling.max(dim=1).values
+            opt_scaling_max = self.cfg.mapping.opt_scaling_max
+            reg_scales = scales_max[scales_max >=
+                                    opt_scaling_max] - opt_scaling_max
+            reg_scales = (self.cfg.mapping.opt_scaling_max_penalty *
+                          reg_scales).sum()
 
             loss_total = geom_l1 + \
-                self.cfg.mapping.opt_lambda_alpha * alpha_loss + \
-                self.cfg.mapping.opt_lambda_normal * normal_loss + \
-                reg_scaling
+                alpha_loss + \
+                normal_loss + \
+                reg_scales
             loss_total.backward()
 
             with torch.no_grad():
+                self.model.get_gmodel.optimizer.step()
                 if loss_ema is None:
                     loss_ema = loss_total.item()
                 else:
@@ -191,8 +198,9 @@ class Mapper:
                                  f"geom={geom_l1:.4f} "
                                  f"normal={normal_loss:.4f} "
                                  f"alpha={alpha_loss:.4f} "
-                                 f"scaling={reg_scaling}")
-                    self.model.get_gmodel.optimizer.step()
+                                 f"scales={reg_scales}")
+                    logger.debug(f"min_opacity="
+                                 f"{self.model.get_gmodel.get_opacity.min()}")
                     rr.log("rend_depth", rr.DepthImage(
                         est_depth.cpu().numpy()
                     ))
@@ -210,5 +218,34 @@ class Mapper:
                     rr.log("est_alpha", rr.Image(
                         (est_alpha[0].cpu().numpy() * 255).astype(np.uint8)
                     ))
-
+                    depth_l1 = torch.abs(gt_depth - est_depth)
+                    depth_l1[..., ~valid_mask] = 0.0
+                    rr.log("depth_l1", rr.DepthImage(
+                        depth_l1.cpu().numpy()
+                    ))
+                    # Log model
+                    gmodel = self.model.get_gmodel
+                    centers = gmodel.get_xyz.cpu().numpy()
+                    hsize = gmodel.get_scaling.cpu().numpy()
+                    hsize = np.concatenate(
+                        [3.3 * hsize, 0.001 * np.ones((hsize.shape[0], 1))], axis=1)
+                    q = gmodel.get_rotation.cpu().numpy()
+                    q = np.concatenate([q[:, 1:], q[:, 0:1]], axis=1)
+                    opacity = gmodel.get_opacity.cpu().numpy().squeeze()
+                    rr.log("model",
+                           rr.Ellipsoids3D(
+                               centers=centers,
+                               half_sizes=hsize,
+                               quaternions=q,
+                               fill_mode=rr.components.FillMode.Solid,
+                           ))
         return
+
+    def prune(self):
+        opacity = self.model.get_gmodel.get_opacity
+        min_opacity = self.cfg.mapping.pruning_min_opacity
+        prune_mask = torch.zeros_like(opacity, dtype=torch.bool)
+        if min_opacity > 0:
+            prune_mask = prune_mask | (opacity < min_opacity)
+        logger.info(f"Pruning {prune_mask.sum()} primitives")
+        self.model.get_gmodel.prune_points(prune_mask.squeeze())

@@ -49,4 +49,3 @@ class SLAM:
         self.tracker.register_model(lmodel)
         self.local_models.append(lmodel)
         self.frames.append(frame)
-        exit(0)

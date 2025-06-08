@@ -87,10 +87,10 @@ class GaussianModel:
             0.9 *
             torch.ones((cloud_xyz.shape[0], 1),
                        dtype=torch.float32, device=self.device))
-        self._xyz = nn.Parameter(cloud_xyz.requires_grad(True))
-        self._scaling = nn.Parameter(scales.requires_grad(True))
-        self._rotation = nn.Parameter(rots.requires_grad(True))
-        self._opacity = nn.Parameter(opacities.requires_grad(True))
+        self._xyz = nn.Parameter(cloud_xyz.requires_grad_(True))
+        self._scaling = nn.Parameter(scales.requires_grad_(True))
+        self._rotation = nn.Parameter(rots.requires_grad_(True))
+        self._opacity = nn.Parameter(opacities.requires_grad_(True))
 
     def training_setup(self, cfg: Configuration):
         optim_cfg = cfg.opt

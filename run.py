@@ -1,5 +1,7 @@
 import typer
 from pathlib import Path
+import random
+import numpy as np
 from utils.config_utils import (
     load_configuration, Configuration, save_configuration)
 from utils.logging_utils import get_logger, set_log_level
@@ -41,6 +43,9 @@ def slam_main(ctx: typer.Context,
               configuration: Path,
               verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False
               ):
+    torch.manual_seed(42)
+    random.seed(42)
+    np.random.seed(42)
     rr.init("SplatLOAM")
     rr.serve_web(open_browser=False)
     set_log_level(verbose)

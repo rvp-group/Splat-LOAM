@@ -79,6 +79,7 @@ def render(
         render_depth_median * depth_ratio
 
     surf_normal = depth_to_normal(camera, surf_depth)
+    surf_normal *= render_alpha
     # surf_normal[..., mask] = surf_normal[..., mask] / render_alpha[..., mask]
     rets.update(
         {
