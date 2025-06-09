@@ -10,7 +10,9 @@ RUN apt update && apt install -y \
 WORKDIR /workspace
 COPY submodules /workspace
 
-RUN pip install diff-surfel-spherical-rasterization/ simple-knn/
+RUN pip install diff-surfel-spherical-rasterization/ \
+  simple-knn/ \
+  gsaligner/
 RUN pip install pyprojections==0.0.3
 
 FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
@@ -29,7 +31,7 @@ RUN apt update && apt install --no-install-recommends -y \
   && rm -rf /var/lib/apt/lists/*
 
 RUN pip install rosbags typer[all] omegaconf matplotlib pytransform3d \
-    plyfile natsort open3d rerun-sdk evo pyprojections
+    plyfile natsort open3d rerun-sdk evo
 
 RUN chmod -R 777 /workspace
 USER $UNAME

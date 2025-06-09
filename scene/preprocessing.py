@@ -1,6 +1,6 @@
 import numpy as np
 import open3d as o3d
-from utils.config_utils import Configuration
+from utils.config_utils import Configuration, TrackingMethod
 from utils.logging_utils import get_logger
 from scene.cameras import Camera
 from scene.frame import Frame
@@ -19,7 +19,7 @@ class Preprocessor:
 
     def __init__(self, cfg: Configuration):
         self.device = cfg.device
-        self.cfg = cfg.preprocessing
+        self.cfg = cfg
 
     def __call__(self,
                  cloud: np.ndarray,
@@ -38,15 +38,16 @@ class Preprocessor:
             timestamp: float
             gt_pose: [4, 4] np.float32 array
         """
+        pcfg = self.cfg.preprocessing
         K, _, vfov, hfov = pyp.calculate_spherical_intrinsics(
-            cloud.T, self.cfg.image_height, self.cfg.image_width
+            cloud.T, pcfg.image_height, pcfg.image_width
         )
         projector = pyp.Camera(
-            self.cfg.image_height,
-            self.cfg.image_width,
+            pcfg.image_height,
+            pcfg.image_width,
             K,
-            self.cfg.depth_min,
-            self.cfg.depth_max,
+            pcfg.depth_min,
+            pcfg.depth_max,
             pyp.CameraModel.Spherical
         )
         lut, _ = projector.project(cloud.T)
@@ -56,8 +57,8 @@ class Preprocessor:
         range_image = ranges[lut]
         range_image[invalid_mask] = 0.0
         normals = np.zeros_like(cloud, dtype=np.float32)
-        valid_mask = (ranges > self.cfg.depth_min) & (
-            ranges <= self.cfg.depth_max)
+        valid_mask = (ranges > pcfg.depth_min) & (
+            ranges <= pcfg.depth_max)
         normals[valid_mask] = self.compute_normals(cloud[valid_mask])
         normals_image = normals[lut]
         normals_image[invalid_mask] = np.float32([0, 0, 0])
@@ -68,10 +69,16 @@ class Preprocessor:
             image_normal=normals_image.transpose(2, 0, 1),
             image_valid=valid_image[None, ...],
             world_T_lidar=gt_pose)
+
+        frame_pose = np.eye(4)
+        if self.cfg.tracking.method == TrackingMethod.gt:
+            frame_pose = gt_pose
+
         return Frame(
             camera=camera,
             timestamp=timestamp,
-            device=self.device)
+            device=self.device,
+            model_T_frame=frame_pose)
 
     def compute_normals(self, cloud: np.ndarray) -> np.ndarray:
         """
@@ -88,7 +95,8 @@ class Preprocessor:
         We also found ground segmentation more effective and easier to tune
         w.r.t. the PCA estimation, thus we prioritize the former.
         """
-        if self.cfg.enable_normal_estimation:
+        pcfg = self.cfg.preprocessing
+        if pcfg.enable_normal_estimation:
             # Convert the cloud in Open3D format and compute normals
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(cloud)
@@ -101,7 +109,7 @@ class Preprocessor:
         else:
             normals = -cloud / np.linalg.norm(cloud, axis=1)[..., None]
 
-        if self.cfg.enable_ground_segmentation:
+        if pcfg.enable_ground_segmentation:
             # TODO: Implement ground segmentation via patchworkpp
             raise NotImplementedError(
                 "Ground segmentation still not implemented")

@@ -4,14 +4,13 @@ from enum import Enum
 from omegaconf import OmegaConf
 from pathlib import Path
 from utils.logging_utils import get_logger
+from gsaligner import GSAlignerParams
 
 logger = get_logger("")
 
 
 class TrackingMethod(str, Enum):
     gt = "gt"
-    p2point = "p2point"
-    p2plane = "p2plane"
     gsaligner = "gsaligner"
 
 
@@ -84,6 +83,7 @@ class TrackingConfig:
     keyframe_threshold_distance: float = 1.0
     keyframe_threshold_nframes: int = -1
     keyframe_threshold_fitness: float = -1.0
+    gsaligner: Optional[GSAlignerParams] = None
 
 
 @dataclass

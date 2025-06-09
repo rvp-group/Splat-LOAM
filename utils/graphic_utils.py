@@ -24,7 +24,8 @@ def getWorld2View2(R, t, translate=np.array([0.0, 0.0, 0.0]), scale=1.0):
 
 
 def depth_to_points(camera,
-                    depth: torch.Tensor) -> torch.Tensor:
+                    depth: torch.Tensor,
+                    transform_in_world: bool = True) -> torch.Tensor:
     """
     Computes backprojection from a camera and it's
     corresponding [1, H, W] depth map
@@ -56,9 +57,12 @@ def depth_to_points(camera,
         s0 * c1,
         s1
     ], dim=-1)
-    rays_d = rays @ c2w[:3, :3].T
-    rays_o = c2w[:3, 3]
-    points = depth.squeeze(0).unsqueeze(-1) * rays_d + rays_o
+    if transform_in_world:
+        rays_d = rays @ c2w[:3, :3].T
+        rays_o = c2w[:3, 3]
+        points = depth.squeeze(0).unsqueeze(-1) * rays_d + rays_o
+    else:
+        points = depth.squeeze(0).unsqueeze(-1) * rays
     return points.permute(2, 0, 1)
 
 

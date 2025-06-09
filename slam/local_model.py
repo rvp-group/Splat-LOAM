@@ -7,7 +7,7 @@ from scene.frame import Frame
 class LocalModel:
     def __init__(self, cfg: Configuration):
         self.cfg = cfg
-        self.keyframes = []
+        self.keyframes: list[Frame] = []
         self.world_T_model = torch.eye(4)
         self.model = GaussianModel(self.cfg.device)
         self.model.training_setup(cfg)
@@ -18,12 +18,21 @@ class LocalModel:
 
     def require_new_model(self) -> bool:
         """
-        Returns true if local model is full or
-        if any conditions are met for new model spawn
+        Returns whether a new model is required based on several
+        conditions:
         """
-        ...
         return False
 
     @property
     def get_gmodel(self):
         return self.model
+
+    @property
+    def size_mb(self):
+        no_fields = 3 * 4 * 2 * 1  # xyz + rots + scales + opacity
+        field_size = 4  # bytes per float32 element
+        return (no_fields * field_size * self.no_gaussians) / (1024.**2)
+
+    @property
+    def no_gaussians(self):
+        return self.model.get_xyz.shape[0]

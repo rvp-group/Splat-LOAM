@@ -24,7 +24,6 @@ class SLAM:
             return
 
         # Tracking
-        logger.debug("Tracking begins")
         self.tracker.track(frame)
 
         # Update keyframe if needed
@@ -32,20 +31,27 @@ class SLAM:
             logger.debug("New keyframe required")
             # Handle new keyframe
             if self.local_models[-1].require_new_model():
-                logger.debug("New local model required")
                 # Update local model before optimization
                 self.initialize_new_local_model(frame)
-            logger.debug("Updating model")
-            self.local_models[-1].insert_keyframe(frame)
-            self.mapper.update_model(frame)
+            self.insert_new_keyframe(frame)
+
         self.frames.append(frame)
 
+        torch.cuda.empty_cache()
+
+    def insert_new_keyframe(self, frame: Frame):
+        logger.info("Inserting new keyframe")
+        self.local_models[-1].insert_keyframe(frame)
+        self.mapper.update_model(frame)
+        self.tracker.register_keyframe(frame)
+
     def initialize_new_local_model(self, frame: Frame):
-        logger.debug("Initializing new model")
+        logger.info("Inserting new local model")
         lmodel = LocalModel(self.cfg)
         lmodel.insert_keyframe(frame)
         self.mapper.register_model(lmodel)
         self.mapper.update_model(frame, initialize_model=True)
         self.tracker.register_model(lmodel)
+        self.tracker.register_keyframe(frame)
         self.local_models.append(lmodel)
         self.frames.append(frame)
