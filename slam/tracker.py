@@ -6,8 +6,8 @@ from scene.frame import Frame
 from gaussian_renderer import render
 from slam.local_model import LocalModel
 from utils.logging_utils import get_logger
+from utils.logging_backends import get_datalogger
 from utils.graphic_utils import depth_to_points, getWorld2View2
-import rerun as rr
 logger = get_logger("tracker")
 
 
@@ -42,7 +42,6 @@ class Tracker:
 
     @torch.no_grad()
     def track(self, frame: Frame) -> None:
-        rr.set_time("tracking", timestamp=frame.timestamp)
         self.aligner.set_source(frame)
         self.keyframe_T_frame = self.aligner.align(
             self.keyframe_T_frame).to(self.cfg.device)
@@ -54,14 +53,9 @@ class Tracker:
             model_T_frame).transpose(0, 1)
         frame.model_T_frame = model_T_frame
         self.num_frames_tracked += 1
-        logger.info("Tracked new frame | "
-                    f"position={model_T_frame[:3, -1].cpu().numpy()} "
-                    f"fitness={self.aligner.fitness():.3f}")
-        rr.log("world/frame", rr.Transform3D(
-            translation=model_T_frame[:3, -1].cpu().numpy(),
-            mat3x3=model_T_frame[:3, :3].cpu().numpy(),
-            axis_length=0.5
-        ))
+        logger.debug(f"track| model_T_frame="
+                     f"{model_T_frame[:3, -1].cpu().numpy()}"
+                     f" fitness={self.aligner.fitness():.3f}")
         return
 
     def require_new_keyframe(self):
@@ -78,10 +72,16 @@ class Tracker:
         no_frames = self.num_frames_tracked
         fitness = self.aligner.fitness()
         kf_f_distance = torch.linalg.norm(self.keyframe_T_frame[:3, -1])
-        return ((threshold_nframes > 0) and
-                (no_frames > threshold_nframes)) or \
-            ((threshold_fitness > 0) and (fitness < threshold_fitness)) or \
-            ((threshold_distance > 0) and (kf_f_distance > threshold_distance))
+        ret = False
+
+        if threshold_nframes and threshold_nframes > 0:
+            ret = ret or (no_frames > threshold_nframes)
+        if threshold_fitness and threshold_fitness > 0:
+            ret = ret or (fitness < threshold_fitness)
+        if threshold_distance and threshold_distance > 0:
+            ret = ret or (kf_f_distance > threshold_distance)
+
+        return ret
 
 
 class Aligner(Protocol):
@@ -108,27 +108,24 @@ class AlignerGT:
 
     def set_source(self, frame: Frame) -> None:
         """ Setup source frame (typically the new frame) """
-        self.source_camera = frame.camera
+        self.source_camera = frame
         depth = frame.camera.image_depth
         points = depth_to_points(frame.camera,
                                  depth,
                                  transform_in_world=False)
         points = points.permute(1, 2, 0).reshape(-1, 3)
-        rr.log("world/frame/cloud", rr.Points3D(
-            positions=points.cpu().numpy()))
 
     def set_target(self, frame: Frame) -> None:
         """ Setup the target frame (typically the fixed keyframe) """
-        self.target_camera = frame.camera
+        self.target_camera = frame
 
     def align(self, iguess: torch.Tensor) -> torch.Tensor:
         """ Estimates target_T_source transform matrix """
-        assert self.source_camera and self.target_camera
-        target_T_world = self.target_camera.world_view_transform
-        target_T_world = target_T_world.transpose(0, 1)
-        world_T_source = self.source_camera.world_view_transform
-        world_T_source = torch.linalg.inv(world_T_source).transpose(0, 1)
-        target_T_source = target_T_world @ world_T_source
+        assert self.source_camera and self.target_camera and self.model
+        world_T_target = self.target_camera.world_T_frame
+        world_T_source = self.source_camera.world_T_frame
+        target_T_source = torch.linalg.inv(world_T_target) @ \
+            world_T_source
         return target_T_source
 
     def fitness(self) -> float:
@@ -168,8 +165,6 @@ class AlignerGeomPhoto:
                                  depth,
                                  transform_in_world=False)
         points = points.permute(1, 2, 0).reshape(-1, 3)
-        rr.log("world/frame/cloud", rr.Points3D(
-            positions=points.cpu().numpy()))
         self.gsaligner.set_query(depth, points, frame.camera.projection_matrix)
 
     def set_target(self, frame: Frame) -> None:

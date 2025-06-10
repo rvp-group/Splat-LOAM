@@ -63,10 +63,10 @@ class DatasetReader_KITTI(DatasetReader):
         self.cloud_reader = PointCloudReader_BIN(pc_cfg)
 
         tr_cfg = config.data.trajectory_reader
-        if tr_cfg.filename is not None:
-            self.traj_reader = TrajectoryReader_KITTI(tr_cfg)
-        else:
+        if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
+        else:
+            self.traj_reader = TrajectoryReader_KITTI(tr_cfg)
 
     def __iter__(self):
         return self
@@ -107,10 +107,10 @@ class DatasetReader_VBR(DatasetReader):
 
         tr_cfg = config.data.trajectory_reader
         tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0, 0, 0, 0, 0, 0, 1]
-        if tr_cfg.filename is not None:
-            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
-        else:
+        if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
+        else:
+            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
 
     def __iter__(self):
         return self
@@ -150,10 +150,10 @@ class DatasetReader_NCD(DatasetReader):
 
         tr_cfg = config.data.trajectory_reader
         tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0.001, 0, 0.091, 0, 0, 0, 1]
-        if tr_cfg.filename is not None:
-            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
-        else:
+        if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
+        else:
+            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
 
     def __iter__(self):
         return self
@@ -192,10 +192,10 @@ class DatasetReader_OXSPIRES(DatasetReader):
 
         tr_cfg = config.data.trajectory_reader
         tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0, 0, 0.124, 0, 0, 1, 0]
-        if tr_cfg.filename is not None:
-            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
-        else:
+        if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
+        else:
+            self.traj_reader = TrajectoryReader_TUM(tr_cfg)
 
     def __iter__(self):
         return self
@@ -232,10 +232,10 @@ class DatasetReader_OXSPIRES_VILENS(DatasetReader):
 
         tr_cfg = config.data.trajectory_reader
         tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0, 0, 0.124, 0, 0, 1, 0]
-        if tr_cfg.filename is not None:
-            self.traj_reader = TrajectoryReader_VILENS(tr_cfg)
-        else:
+        if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
+        else:
+            self.traj_reader = TrajectoryReader_VILENS(tr_cfg)
 
     def __iter__(self):
         return self
@@ -276,6 +276,6 @@ datasetreader_available = {
 }
 
 
-def get_dataset_reader(config: Configuration) -> DatasetReader:
-    dr_type = config.data.dataset_type
-    return datasetreader_available[dr_type](config)
+def get_dataset_reader(cfg: Configuration) -> DatasetReader:
+    dr_type = cfg.data.dataset_type
+    return datasetreader_available[dr_type](cfg)

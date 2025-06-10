@@ -35,6 +35,12 @@ class TrajectoryWriterType(str, Enum):
     tum = "tum"
 
 
+class DataLoggerType(str, Enum):
+    rerun = "rerun"
+    wandb = "wandb"
+    tensorboard = "tensorboard"
+
+
 @dataclass
 class TrajectoryReaderConfig:
     # Format of trajectory file
@@ -106,10 +112,24 @@ class MappingConfig:
     # Penalty for higher scaling factors
     opt_scaling_max_penalty: float = 0.2
 
+    lmodel_threshold_ngaussians: Optional[int] = None
+    lmodel_threshold_nkeyframes: Optional[int] = None
+
 
 @dataclass
 class LoggingConfig:
-    enable_rerun: bool = True
+    enable: bool = True
+    logger_type: Optional[DataLoggerType] = DataLoggerType.rerun
+    # Concerning rerun, only one of the following options should be set.
+    # If more are set, only the first will be used.
+    # Spawn the rerun GUI
+    rerun_spawn: Optional[bool] = True
+    # should be enabled for remote viewer. Does not spawn a GUI but
+    # serve log-data over gRPC
+    rerun_serve_grpc: Optional[bool] = None
+    # if a remote viewer is already instantiated, provide
+    # url here to allow connection
+    rerun_connect_grpc_url: Optional[str] = None
 
 
 @dataclass

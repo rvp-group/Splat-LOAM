@@ -3,11 +3,12 @@ from pathlib import Path
 import random
 import numpy as np
 from utils.config_utils import (
-    load_configuration, Configuration, save_configuration)
+    load_configuration, Configuration, save_configuration,
+    TrackingMethod)
 from utils.logging_utils import get_logger, set_log_level
 from typing_extensions import Annotated
 from slam.slam import SLAM
-from scene.dataset_readers import get_dataset_reader
+from scene.dataset_readers import get_dataset_reader, DatasetReader
 from scene.preprocessing import Preprocessor
 from rich.progress import track
 import torch
@@ -49,16 +50,18 @@ def slam_main(ctx: typer.Context,
     rr.init("SplatLOAM")
     rr.serve_web(open_browser=False)
     set_log_level(verbose)
-    logger.info("Running SLAM mode")
     cfg = load_configuration(configuration, ctx.args)
     logger.info(f"Running experiment with configuration:\n{cfg}")
     data_loader = get_dataset_reader(cfg)
     preprocessor = Preprocessor(cfg)
     slam_module = SLAM(cfg)
+    pipeline_sanity_check(cfg, data_loader, preprocessor, slam_module)
     for cloud, timestamp, pose in track(data_loader,
                                         description="Processing frames"):
         frame = preprocessor(cloud, timestamp, pose)
         slam_module.process(frame)
+
+    input("Done. Press Enter to finalize")
 
     raise NotImplementedError("Not yet done!")
     ...
@@ -110,6 +113,26 @@ def generate_dummy_cfg(output_filename: Path):
     logger.info(f"Default cfg: {cfg}")
     logger.info(f"Saved at {output_filename}")
     save_configuration(output_filename, cfg)
+
+
+def pipeline_sanity_check(cfg: Configuration,
+                          data_loader: DatasetReader,
+                          preprocessor: Preprocessor,
+                          slam_module: SLAM) -> None:
+    """
+    Entrypoint to verify the post-initialization state of the system
+    """
+    from utils.trajectory_utils import TrajectoryReader_NULL
+    # For mapping, verify that if tracking.method.gt is set,
+    # TrajectoryReader is not null
+    if cfg.tracking.method == TrackingMethod.gt and \
+            isinstance(data_loader.traj_reader, TrajectoryReader_NULL):
+        raise RuntimeError("Tracking method is set to GT but DatasetReader has"
+                           " TrajectoryReader_NULL set. "
+                           "Verify input trajectory file.")
+    # Add other checks here before running the pipeline
+    ...
+    return
 
 
 if __name__ == "__main__":

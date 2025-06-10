@@ -20,8 +20,19 @@ class LocalModel:
         """
         Returns whether a new model is required based on several
         conditions:
+        1) no_gaussians > mapping.lmodel_threshold_ngaussians (if >0)
+        2) no_keyframes > mapping.lmodel_threshold_nkeyframes (if >0)
         """
-        return False
+        threshold_ngaussians = self.cfg.mapping.lmodel_threshold_ngaussians
+        threshold_nkeyframes = self.cfg.mapping.lmodel_threshold_nkeyframes
+        ret = False
+
+        if threshold_ngaussians and threshold_ngaussians > 0:
+            ret = ret or (self.no_gaussians > threshold_ngaussians)
+        if threshold_nkeyframes and threshold_nkeyframes > 0:
+            ret = ret or (len(self.keyframes) > threshold_nkeyframes)
+
+        return ret
 
     @property
     def get_gmodel(self):

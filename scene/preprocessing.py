@@ -24,7 +24,7 @@ class Preprocessor:
     def __call__(self,
                  cloud: np.ndarray,
                  timestamp: float,
-                 gt_pose: np.ndarray) -> Frame:
+                 gt_pose: np.ndarray | None = None) -> Frame:
         """
         The function completes the following steps:
         - Compute the optimal cloud intrinsics.
@@ -70,15 +70,17 @@ class Preprocessor:
             image_valid=valid_image[None, ...],
             world_T_lidar=gt_pose)
 
-        frame_pose = np.eye(4)
-        if self.cfg.tracking.method == TrackingMethod.gt:
-            frame_pose = gt_pose
+        # frame_pose = np.eye(4)
+        # if self.cfg.tracking.method == TrackingMethod.gt and \
+        #         gt_pose is not None:
+        #     frame_pose = gt_pose
+        frame_pose = np.eye(4) if gt_pose is None else gt_pose
 
         return Frame(
             camera=camera,
             timestamp=timestamp,
             device=self.device,
-            model_T_frame=frame_pose)
+            world_T_frame=frame_pose)
 
     def compute_normals(self, cloud: np.ndarray) -> np.ndarray:
         """

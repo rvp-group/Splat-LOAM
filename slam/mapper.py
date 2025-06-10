@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from utils.config_utils import Configuration
 from utils.logging_utils import get_logger
 from utils.graphic_utils import depth_to_points, compute_depth_gradient
@@ -19,7 +20,6 @@ class Mapper:
     def __init__(self, cfg: Configuration):
         self.cfg = cfg
         self.model: LocalModel = None
-        ...
 
     def register_model(self, model: LocalModel) -> None:
         """
@@ -137,9 +137,17 @@ class Mapper:
     def optimize(self) -> None:
         loss_ema = None
         loss_ema_alpha = 0.1
+        last_kf_prob = self.cfg.mapping.prob_view_last_keyframe
+        if last_kf_prob is None or last_kf_prob < 0.0:
+            kf_probabilities = np.float32(
+                [1.0 / len(self.model.keyframes)] * len(self.model.keyframes))
+        else:
+            kf_probabilities = samplers.sample_geometric(self.model.keyframes,
+                                                         last_kf_prob)
         for iter in range(self.cfg.mapping.num_iterations + 1):
             self.model.get_gmodel.optimizer.zero_grad(set_to_none=True)
-            keyframe = samplers.sample_uniform(self.model.keyframes)
+            keyframe = np.random.choice(self.model.keyframes,
+                                        p=kf_probabilities)
             render_pkg = render(keyframe.camera,
                                 self.model.get_gmodel,
                                 self.cfg.opt.depth_ratio)
@@ -153,6 +161,12 @@ class Mapper:
             gt_alpha, gt_depth = keyframe.camera.image_valid, \
                 keyframe.camera.image_depth
             valid_mask = gt_alpha[0] == 1.0
+
+            # Try normalizing depth (might improve ?)
+            # gt_depth = gt_depth / self.cfg.preprocessing.depth_max
+            # est_depth = est_depth / self.cfg.preprocessing.depth_max
+            # gt_depth[gt_depth > 0] = 1 / gt_depth[gt_depth > 0]
+            # est_depth[est_depth > 0] = 1 / est_depth[est_depth > 0]
 
             geom_l1 = torch.abs(valid_mask * (
                 est_depth - gt_depth)).mean()
@@ -194,46 +208,6 @@ class Mapper:
                     )
                 if (iter + 1) % 100 == 0:
                     logger.debug(f"it={iter+1} l_ema={loss_ema:.3f}")
-                # if (iter + 1) % 10 == 0:
-                #     logger.debug(f"(it={iter+1}) loss={loss_ema:.4f}")
-                #     rr.log("rend_depth", rr.DepthImage(
-                #         est_depth.cpu().numpy()
-                #     ))
-                #     rr.log("rend_normal", rr.Image(
-                #         ((est_normal.permute(1, 2, 0).cpu().numpy()
-                #           * 0.5 + 0.5) * 255).astype(np.uint8)
-                #     ))
-                #     rr.log("surf_normal", rr.Image(
-                #         ((surf_normal.permute(1, 2, 0).cpu().numpy()
-                #           * 0.5 + 0.5) * 255).astype(np.uint8)
-                #     ))
-                #     rr.log("valid_mask", rr.Image(
-                #         valid_mask.cpu().numpy().astype(np.uint8) * 255
-                #     ))
-                #     rr.log("est_alpha", rr.Image(
-                #         (est_alpha[0].cpu().numpy() * 255).astype(np.uint8)
-                #     ))
-                #     depth_l1 = torch.abs(gt_depth - est_depth)
-                #     depth_l1[..., ~valid_mask] = 0.0
-                #     rr.log("depth_l1", rr.DepthImage(
-                #         depth_l1.cpu().numpy()
-                #     ))
-                #     # Log model
-                #     gmodel = self.model.get_gmodel
-                #     centers = gmodel.get_xyz.cpu().numpy()
-                #     hsize = gmodel.get_scaling.cpu().numpy()
-                #     hsize = np.concatenate(
-                #         [3.3 * hsize, 0.001 * np.ones((hsize.shape[0], 1))], axis=1)
-                #     q = gmodel.get_rotation.cpu().numpy()
-                #     q = np.concatenate([q[:, 1:], q[:, 0:1]], axis=1)
-                #     opacity = gmodel.get_opacity.cpu().numpy().squeeze()
-                #     rr.log("model",
-                #            rr.Ellipsoids3D(
-                #                centers=centers,
-                #                half_sizes=hsize,
-                #                quaternions=q,
-                #                fill_mode=rr.components.FillMode.Solid,
-                #            ))
         return
 
     def prune(self):
@@ -241,7 +215,6 @@ class Mapper:
         Prune gaussians based on several factors:
         1) opacity < cfg.mapping.pruning_min_opacity (if > 0)
         2) norm(scaling) < cfg.mapping.pruning_min_size (if > 0)
-        ...
         """
         opacity = self.model.get_gmodel.get_opacity
         min_opacity = self.cfg.mapping.pruning_min_opacity
