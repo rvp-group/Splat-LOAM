@@ -181,22 +181,23 @@ class TrajectoryWriter_TUM:
         filename.parent.mkdir(parents=True, exist_ok=True)
         with open(filename, "w") as f:
             f.write("#timestamp tx ty tz qx qy qz qw\n")
-        for timestamp, pose in zip(timestamps, poses):
-            wtc = pose
-            # fix transform matrix in case of numerical errors
-            wtc[-1] = np.array([0, 0, 0, 1])
-            wtc[:3, :3] = norm_matrix(wtc[:3, :3])
-            wtc = check_transform(wtc)
-            pq = np.hstack(
-                (
-                    wtc[:3, 3],
-                    quaternion_from_matrix(wtc[:3, :3], strict_check=False),
+            for timestamp, pose in zip(timestamps, poses):
+                wtc = pose
+                # fix transform matrix in case of numerical errors
+                wtc[-1] = np.array([0, 0, 0, 1])
+                wtc[:3, :3] = norm_matrix(wtc[:3, :3])
+                wtc = check_transform(wtc)
+                pq = np.hstack(
+                    (
+                        wtc[:3, 3],
+                        quaternion_from_matrix(
+                            wtc[:3, :3], strict_check=False),
+                    )
                 )
-            )
-            f.write(
-                f"{timestamp:.6f} {pq[0]:.4f} {pq[1]:.4f} "
-                f"{pq[2]:.4f} {pq[4]} {pq[5]} {pq[6]} {pq[3]}\n"
-            )
+                f.write(
+                    f"{timestamp:.6f} {pq[0]:.4f} {pq[1]:.4f} "
+                    f"{pq[2]:.4f} {pq[4]} {pq[5]} {pq[6]} {pq[3]}\n"
+                )
 
 
 class TrajectoryWriter_KITTI:

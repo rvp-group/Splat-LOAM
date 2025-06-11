@@ -1,4 +1,5 @@
 import torch
+from pathlib import Path
 import torch.nn as nn
 import numpy as np
 from utils.general_utils import (
@@ -11,6 +12,7 @@ from utils.logging_utils import get_logger
 from utils.graphic_utils import BasicPointCloud
 from simple_knn._C import distCUDA2
 from utils.config_utils import Configuration
+from plyfile import PlyData, PlyElement
 
 logger = get_logger("gaussian_model")
 
@@ -117,6 +119,106 @@ class GaussianModel:
             }
         ]
         self.optimizer = torch.optim.Adam(training_vars, lr=0.0, eps=1e-15)
+
+    def construct_list_of_attributes(self):
+        l = ["x", "y", "z"]
+        l.append("opacity")
+        for i in range(self._scaling.shape[1]):
+            l.append("scale_{}".format(i))
+        for i in range(self._rotation.shape[1]):
+            l.append("rot_{}".format(i))
+        for i in range(3):
+            l.append("f_dc_{}".format(i))
+        # for i in range(3):
+        #     l.append("f_rest_{}".format(i))
+        return l
+
+    @torch.no_grad()
+    def save_ply(self, filename: Path) -> None:
+        """
+        For compatibility, we also keep colors as if we had
+        active_sh_degree = 0
+        TODO: maybe add option to decrease memory usage
+        """
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        xyz = self._xyz.detach().cpu().numpy()
+        opacities = self._opacity.detach().cpu().numpy()
+        scale = self._scaling.detach().cpu().numpy()
+        rotation = self._rotation.detach().cpu().numpy()
+
+        dtype_full = [
+            (attribute, "f4") for attribute in
+            self.construct_list_of_attributes()
+        ]
+
+        elements = np.empty(xyz.shape[0], dtype=dtype_full)
+        attributes = np.concatenate(
+            (
+                xyz,
+                opacities,
+                scale,
+                rotation,
+                np.zeros((xyz.shape[0], 3)),
+            ),
+            axis=1,
+        )
+        elements[:] = list(map(tuple, attributes))
+        el = PlyElement.describe(elements, "vertex")
+        PlyData([el]).write(filename)
+
+    def load_ply(self, path):
+        plydata = PlyData.read(path)
+
+        xyz = np.stack(
+            (
+                np.asarray(plydata.elements[0]["x"]),
+                np.asarray(plydata.elements[0]["y"]),
+                np.asarray(plydata.elements[0]["z"]),
+            ),
+            axis=1,
+        )
+        opacities = np.asarray(plydata.elements[0]["opacity"])[..., np.newaxis]
+        # opacities = self.inverse_opacity_activation(
+        #     torch.ones((xyz.shape[0], 1),
+        #                dtype=torch.float32, device="cuda") * 0.99
+        # )
+
+        scale_names = [
+            p.name
+            for p in plydata.elements[0].properties
+            if p.name.startswith("scale_")
+        ]
+        scale_names = sorted(scale_names, key=lambda x: int(x.split("_")[-1]))
+        scales = np.zeros((xyz.shape[0], len(scale_names)))
+        for idx, attr_name in enumerate(scale_names):
+            scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
+
+        rot_names = [
+            p.name for p in plydata.elements[0].properties if
+            p.name.startswith("rot")
+        ]
+        rot_names = sorted(rot_names, key=lambda x: int(x.split("_")[-1]))
+        rots = np.zeros((xyz.shape[0], len(rot_names)))
+        for idx, attr_name in enumerate(rot_names):
+            rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
+
+        self._xyz = nn.Parameter(
+            torch.tensor(xyz, dtype=torch.float,
+                         device="cuda").requires_grad_(True)
+        )
+        self._opacity = nn.Parameter(
+            torch.tensor(opacities,
+                         dtype=torch.float, device="cuda").requires_grad_(True)
+        )
+        self._scaling = nn.Parameter(
+            torch.tensor(scales, dtype=torch.float,
+                         device="cuda").requires_grad_(True)
+        )
+        self._rotation = nn.Parameter(
+            torch.tensor(rots, dtype=torch.float,
+                         device="cuda").requires_grad_(True)
+        )
 
     def replace_tensor_to_optimizer(self, tensor: torch.Tensor,
                                     name: str):

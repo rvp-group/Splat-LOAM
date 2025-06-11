@@ -1,5 +1,13 @@
 import torch
+import random
 import torch.nn.functional as F
+import numpy as np
+
+
+def safe_state():
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
 
 
 def build_rotation(r: torch.Tensor) -> torch.Tensor:
@@ -10,7 +18,7 @@ def build_rotation(r: torch.Tensor) -> torch.Tensor:
 
     q = r / norm[:, None]
 
-    R = torch.zeros((q.size(0), 3, 3), device="cuda")
+    R = torch.zeros((q.size(0), 3, 3), device=r.device)
 
     r = q[:, 0]
     x = q[:, 1]
@@ -30,7 +38,7 @@ def build_rotation(r: torch.Tensor) -> torch.Tensor:
 
 
 def build_scaling_rotation(s: torch.Tensor, r: torch.Tensor) -> torch.Tensor:
-    L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device="cuda")
+    L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device=s.device)
     R = build_rotation(r)
     L[:, 0, 0] = s[:, 0]
     L[:, 1, 1] = s[:, 1]

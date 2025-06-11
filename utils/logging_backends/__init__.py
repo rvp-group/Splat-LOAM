@@ -7,12 +7,21 @@ datalogger_available = {
     DataLoggerType.rerun: DataLoggerRR
 }
 
+
+class DataLoggerDummy:
+    def nop(*args, **kwargs): pass
+    def __getattr__(self, _): return self.nop
+
+
 _lock = Lock()
 _datalogger: DataLoggerProtocol | None = None
 
 
 def get_datalogger(cfg: Configuration):
     global _datalogger
+
+    if cfg.logging.enable is False:
+        return DataLoggerDummy()
 
     if _datalogger is None:
         with _lock:

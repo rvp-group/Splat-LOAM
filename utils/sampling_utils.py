@@ -3,6 +3,7 @@ import numpy as np
 
 def sample_uniform(list_full):
     # TODO: Change or remove
+    raise NotImplementedError("sample_uniform has to be fixed")
     return np.random.choice(list_full, 1)[0]
 
 

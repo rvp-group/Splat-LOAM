@@ -4,7 +4,7 @@ from typing import Protocol
 
 class DataLoggerProtocol(Protocol):
 
-    def set_timestamp(self, timestamp: float):
+    def set_timestamp(self, timestamp: float) -> None:
         ...
 
     def log_image(self, name: str, image: torch.Tensor) -> None:

@@ -1,5 +1,11 @@
 import torch
-from utils.config_utils import Configuration
+import numpy as np
+from utils.trajectory_utils import (
+    TrajectoryWriterType,
+    trajectory_writer_available)
+from datetime import datetime
+from pathlib import Path
+from utils.config_utils import Configuration, save_configuration
 from scene.frame import Frame
 from slam.mapper import Mapper
 from slam.tracker import Tracker
@@ -8,6 +14,7 @@ from utils.graphic_utils import depth_to_points
 from utils.logging_utils import get_logger
 from utils.logging_backends import get_datalogger
 from gaussian_renderer import render
+from scene.postprocessing import ResultGraph
 
 logger = get_logger("slam")
 
@@ -18,7 +25,10 @@ class SLAM:
         self.mapper = Mapper(cfg)
         self.tracker = Tracker(cfg)
         self.local_models: list[LocalModel] = []
-        self.frames = []
+        self.frames: list[Frame] = []
+        # Required to output results
+        self.date_start = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.world_T_odom: list[np.array] = []
 
     def process(self, frame: Frame) -> None:
         get_datalogger(self.cfg).set_timestamp(frame.timestamp)
@@ -51,6 +61,7 @@ class SLAM:
             mTkf = self.local_models[-1].keyframes[-1].model_T_frame
             kfTf = self.tracker.keyframe_T_frame
             wTf = wTm @ mTkf @ kfTf
+            self.world_T_odom.append(wTf.cpu().numpy())
             logger.info(f"t={frame.timestamp} | "
                         f"pos={wTf[:3, -1].cpu().numpy()}")
             dlog = get_datalogger(self.cfg)
@@ -110,3 +121,45 @@ class SLAM:
         with torch.no_grad():
             get_datalogger(self.cfg).log_model(
                 "world/model", self.local_models[-1].get_gmodel)
+
+    def save_results(self) -> Path:
+        """
+        Save output of SLAM system.
+        Specifically, it stores:
+        - configuration (cfg.yaml)
+        - odometry results (odom.txt) [uses output.writer for format]
+        - models-keyframes graph (graph.yaml) [refer to scene.postprocessing]
+        - models/ : local models as PLY files
+        """
+        ofolder = self.cfg.output.folder
+        result_folder = "results/" if ofolder is None else \
+            ofolder
+
+        result_folder = Path(result_folder)
+        result_folder = result_folder / self.date_start
+        result_folder.mkdir(parents=True, exist_ok=False)
+        logger.info(f"Saving results in {result_folder}")
+        result_models_folder = result_folder / "models"
+        result_models_folder.mkdir(parents=True, exist_ok=True)
+        save_configuration(result_folder / "cfg.yaml", self.cfg)
+        writer_type = self.cfg.output.writer
+        if writer_type is None:
+            logger.debug("output.writer is not set. Assuming tum")
+            writer_type = TrajectoryWriterType.tum
+
+        trajectory_writer = trajectory_writer_available[writer_type]
+        timestamps = [f.timestamp for f in self.frames]
+        trajectory_writer.write(result_folder / "odom.txt", self.world_T_odom,
+                                timestamps)
+
+        rgraph = ResultGraph.from_slam(self.cfg,
+                                       self.local_models,
+                                       Path("models"))
+        save_configuration(result_folder / "graph.yaml", rgraph)
+        for i, rmodel in enumerate(rgraph.models):
+            gmodel = self.local_models[i].get_gmodel
+            filename = rmodel.filename
+            gmodel_path = result_folder / filename
+            logger.debug(f"Saving model at {gmodel_path}")
+            gmodel.save_ply(gmodel_path)
+        return result_folder
