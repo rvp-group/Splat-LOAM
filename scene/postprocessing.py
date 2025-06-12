@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 from scene.frame import Frame
 from slam.local_model import LocalModel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 logger = get_logger("postprocessing")
 
@@ -93,11 +94,12 @@ class ResultGraph:
 def mesh_poisson(graph: ResultGraph,
                  cfg: Configuration,
                  graph_directory: Path,
-                 kf_interval: int,
-                 kf_samples: int,
+                 kf_interval: int | None,
+                 kf_samples: int | None,
                  min_opacity: float,
-                 poisson_depth: int,
-                 poisson_min_density: float,
+                 poisson_depth: int | None,
+                 poisson_width: float | None,
+                 poisson_min_density: float | None,
                  max_depth_dist: float,
                  use_median_depth: bool):
     """
@@ -113,100 +115,102 @@ def mesh_poisson(graph: ResultGraph,
     # Important notice:
     # Each frame should be rasterized in model frame.
     # world_T_model should be used only to move the cameras in world frame.
-    import rerun as rr
-    import time
-    rr.init("meshing")
-    rr.serve_grpc()
-    for rmodel in graph.models:
-        # Load the Gaussian model
-        gmodel = GaussianModel()
-        gmodel_filename = graph_directory / rmodel.filename
-        logger.debug(f"Loading GaussianModel at {gmodel_filename}")
-        gmodel.load_ply(graph_directory / rmodel.filename)
-        # convert to numpy
-        world_T_model = np.array(rmodel.world_T_model).reshape(3, 4)
-        world_T_model = np.vstack([world_T_model, np.array([0, 0, 0, 1])])
-        global_pcd = o3d.geometry.PointCloud()
-        for rfid in rmodel.frame_ids:
-            rframe = graph.frames[rfid]
-            assert rframe.id == rfid
-            assert rmodel.id == rframe.model_id
-            model_T_frame = np.array(rframe.model_T_frame).reshape(3, 4)
-            model_T_frame = np.vstack([model_T_frame, np.array([0, 0, 0, 1])])
-            world_T_frame = world_T_model @ model_T_frame
+    # import rerun as rr
+    # import time
+    # rr.init("meshing")
+    # rr.serve_grpc()
+    global_pcd = o3d.geometry.PointCloud()
+    processed_frames = 0
+    with Progress() as progress:
+        tbar = progress.add_task("Processing frames", total=len(graph.frames))
+        for rmodel in graph.models:
+            # Load the Gaussian model
+            gmodel = GaussianModel()
+            gmodel_filename = graph_directory / rmodel.filename
+            logger.debug(f"Loading GaussianModel at {gmodel_filename}")
+            gmodel.load_ply(graph_directory / rmodel.filename)
+            # convert to numpy
+            world_T_model = np.array(rmodel.world_T_model).reshape(3, 4)
+            world_T_model = np.vstack([world_T_model, np.array([0, 0, 0, 1])])
+            for rfid in rmodel.frame_ids:
+                processed_frames += 1
+                if kf_interval is not None and kf_interval > 0 and \
+                        (processed_frames % kf_interval):
+                    progress.update(tbar, advance=1)
+                    continue
+                rframe = graph.frames[rfid]
+                assert rframe.id == rfid
+                assert rmodel.id == rframe.model_id
+                model_T_frame = np.array(rframe.model_T_frame).reshape(3, 4)
+                model_T_frame = np.vstack(
+                    [model_T_frame, np.array([0, 0, 0, 1])])
 
-            camera_K = np.array([
-                [rframe.projmatrix[0], 0, rframe.projmatrix[2]],
-                [0, rframe.projmatrix[1], rframe.projmatrix[3]],
-                [0, 0, 1]
-            ])
-            width, height = cfg.preprocessing.image_width, \
-                cfg.preprocessing.image_height
-            camera = Camera(K=camera_K,
-                            image_depth=np.zeros((1, height, width)),
-                            image_normal=np.zeros((3, height, width)),
-                            image_valid=np.zeros((1, height, width)),
-                            world_T_lidar=model_T_frame,
-                            data_device=cfg.device)
-            # render_pkg = render(camera, gmodel, cfg.opt.depth_ratio)
-            depth_ratio = 1.0 if use_median_depth else 0.0
-            render_pkg = render(camera, gmodel, depth_ratio)
+                camera_K = np.array([
+                    [rframe.projmatrix[0], 0, rframe.projmatrix[2]],
+                    [0, rframe.projmatrix[1], rframe.projmatrix[3]],
+                    [0, 0, 1]
+                ])
+                width, height = cfg.preprocessing.image_width, \
+                    cfg.preprocessing.image_height
+                camera = Camera(K=camera_K,
+                                image_depth=np.zeros((1, height, width)),
+                                image_normal=np.zeros((3, height, width)),
+                                image_valid=np.zeros((1, height, width)),
+                                world_T_lidar=model_T_frame,
+                                data_device=cfg.device)
+                depth_ratio = 1.0 if use_median_depth else 0.0
+                render_pkg = render(camera, gmodel, depth_ratio)
 
-            depth = render_pkg["surf_depth"]
-            normals = render_pkg["rend_normal"]
-            alpha = render_pkg["rend_alpha"]
-            dist = render_pkg["rend_dist"]
+                depth = render_pkg["surf_depth"]
+                normals = render_pkg["rend_normal"]
+                alpha = render_pkg["rend_alpha"]
+                dist = render_pkg["rend_dist"]
 
-            invalid_mask = alpha < min_opacity
-            invalid_mask = invalid_mask | (dist > max_depth_dist)
-            invalid_mask = invalid_mask[0]
+                invalid_mask = alpha < min_opacity
+                invalid_mask = invalid_mask | (dist > max_depth_dist)
+                invalid_mask = invalid_mask[0]
 
-            depth[..., invalid_mask] = 0.0
-            normals[..., invalid_mask] = 0.0
+                depth[..., invalid_mask] = 0.0
+                normals[..., invalid_mask] = 0.0
 
-            xyz = depth_to_points(camera, depth, True)[..., ~invalid_mask]
-            nxyz = normals[..., ~invalid_mask]
-            xyz = xyz.T.cpu().numpy()
-            nxyz = nxyz.T.cpu().numpy()
-            sampled_idxs = np.random.choice(xyz.shape[0], kf_samples)
-            xyz = xyz[sampled_idxs]
-            nxyz = nxyz[sampled_idxs]
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(xyz)
-            pcd.normals = o3d.utility.Vector3dVector(nxyz)
-            # pcd.transform(world_T_frame)
-            pcd.transform(world_T_model)
-            global_pcd += pcd
-        logger.info(f"Merged {global_pcd}")
-        logger.debug("Removing statistical outliers")
-        global_pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
-        logger.info(f"Running Poisson Reconstruction "
-                    f"with {poisson_depth} max depth")
-        with o3d.utility.VerbosityContextManager(
-                o3d.utility.VerbosityLevel.Debug) as _:
-            mesh, densities = \
-                o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-                    global_pcd, depth=poisson_depth)
+                xyz = depth_to_points(camera, depth, True)[..., ~invalid_mask]
+                nxyz = normals[..., ~invalid_mask]
+                xyz = xyz.T.cpu().numpy()
+                nxyz = nxyz.T.cpu().numpy()
+                sampled_idxs = np.random.choice(xyz.shape[0], kf_samples)
+                xyz = np.copy(xyz[sampled_idxs])
+                nxyz = np.copy(nxyz[sampled_idxs])
+
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(xyz)
+                pcd.normals = o3d.utility.Vector3dVector(nxyz)
+                pcd.transform(world_T_model)
+                global_pcd += pcd
+                progress.update(tbar, advance=1)
+    logger.info(f"Merged{global_pcd}")
+    logger.debug("Removing statistical outliers")
+    global_pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    logger.info(
+        "Running Poisson Surface Reconstruction. "
+        "[green]This may take a while...[/green]")
+    if poisson_depth is None or poisson_depth < 0 and \
+            poisson_width > 0:
+        logger.info(f"Using width={poisson_width}")
+        mesh, densities = \
+            o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+                global_pcd, width=poisson_width)
+    else:
+        logger.info(f"Using depth={poisson_depth}")
+        mesh, densities = \
+            o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+                global_pcd, depth=poisson_depth)
+
+    if poisson_min_density > 0:
+        logger.info(f"Removing vertices with "
+                    f"density < {poisson_min_density} percentile")
         densities = np.asarray(densities)
         vertices_to_remove = densities < np.quantile(densities,
                                                      poisson_min_density)
         mesh.remove_vertices_by_mask(vertices_to_remove)
-        mesh.compute_vertex_normals()
-        # logger.debug("Clustering connected triangles")
-        # with o3d.utility.VerbosityContextManager(
-        #         o3d.utility.VerbosityLevel.Debug) as _:
-        #     triangle_clusters, cluster_n_triangles, cluster_area = (
-        #         mesh.cluster_connected_triangles()
-        #     )
-        # triangle_clusters = np.asarray(triangle_clusters)
-        # cluster_n_triangles = np.asarray(cluster_n_triangles)
-        # cluster_area = np.asarray(cluster_area)
-        # triangles_to_remove = cluster_n_triangles[triangle_clusters] < 100
-        # mesh.remove_vertices_by_mask(triangles_to_remove)
-        logger.info("Saving mesh")
-        o3d.io.write_triangle_mesh(
-            "test_mesh.ply",
-            mesh, write_vertex_normals=True)
-        return mesh
-
-    ...
+    mesh.compute_vertex_normals()
+    return mesh

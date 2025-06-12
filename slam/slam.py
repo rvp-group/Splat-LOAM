@@ -38,6 +38,11 @@ class SLAM:
                 # Align to GT if first frame
                 frame.model_T_frame = frame.world_T_frame.clone()
             self.initialize_new_local_model(frame)
+            wTm = self.local_models[-1].world_T_model
+            mTkf = self.local_models[-1].keyframes[-1].model_T_frame
+            kfTf = self.tracker.keyframe_T_frame
+            wTf = wTm @ mTkf @ kfTf
+            self.world_T_odom.append(wTf.cpu().numpy())
             return
 
         # Tracking

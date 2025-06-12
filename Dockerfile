@@ -31,7 +31,7 @@ RUN apt update && apt install --no-install-recommends -y \
   && rm -rf /var/lib/apt/lists/*
 
 RUN pip install rosbags typer[all] omegaconf matplotlib pytransform3d \
-    plyfile natsort open3d rerun-sdk evo
+    plyfile natsort open3d==0.19.0 rerun-sdk evo
 
 RUN chmod -R 777 /workspace
 USER $UNAME

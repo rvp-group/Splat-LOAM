@@ -49,6 +49,10 @@ class TrajectoryReaderConfig:
     filename: Optional[str] = None
     # Association tolerance for timestamp (1ms by default)
     timestamp_dtol: float = 1e-3
+    # If using KITTI, you can pass the times.txt file
+    # to allow the loading of timestamps
+    # kinda required for evaluation! (DatasetReader does this for you)
+    timestamp_from_filename_kitti: Optional[str] = None
     # If gt_T_sensor is provided as pos-quat, set this variable
     gt_T_sensor_t_xyz_q_xyzw: Optional[tuple[float]] = field(
         default_factory=tuple)
@@ -228,3 +232,5 @@ def load_configuration(filename: Path, cli_args: list[str] = None) -> \
 def save_configuration(filename: Path, configuration: Configuration) \
         -> None:
     OmegaConf.save(configuration, filename)
+    # Sanity check
+    assert configuration == OmegaConf.load(filename)

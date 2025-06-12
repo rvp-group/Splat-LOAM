@@ -1,4 +1,5 @@
 from utils.pointcloud_utils import pointcloud_reader_available
+import copy
 from utils.trajectory_utils import trajectory_reader_available
 from pathlib import Path
 from utils.config_utils import (
@@ -58,14 +59,19 @@ class DatasetReader_KITTI(DatasetReader):
         DatasetReader.__init__(self, config)
         pc_cfg = config.data.cloud_reader
         base_folder = Path(pc_cfg.cloud_folder)
-        pc_cfg.cloud_folder = base_folder / "velodyne"
-        pc_cfg.timestamp_filename = base_folder / "times.txt"
+        if "velodyne" in base_folder.name:
+            pc_cfg.timestamp_filename = base_folder.parent / "times.txt"
+        else:
+            pc_cfg.cloud_folder = base_folder / "velodyne"
+            pc_cfg.timestamp_filename = base_folder / "times.txt"
         self.cloud_reader = PointCloudReader_BIN(pc_cfg)
-
         tr_cfg = config.data.trajectory_reader
         if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
         else:
+            if tr_cfg.timestamp_from_filename_kitti is None:
+                tr_cfg.timestamp_from_filename_kitti = \
+                    pc_cfg.timestamp_filename
             self.traj_reader = TrajectoryReader_KITTI(tr_cfg)
 
     def __iter__(self):

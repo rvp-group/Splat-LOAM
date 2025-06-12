@@ -1,9 +1,12 @@
 import typer
+from utils.eval_utils import evaluate_rpe
+import open3d as o3d
+from datetime import datetime
 from scene.postprocessing import ResultGraph, mesh_poisson
 from pathlib import Path
 from utils.config_utils import (
     load_configuration, Configuration, save_configuration,
-    TrackingMethod)
+    TrackingMethod, TrajectoryReaderConfig)
 from utils.logging_utils import get_logger, set_log_level
 from utils.general_utils import safe_state
 from typing_extensions import Annotated
@@ -11,6 +14,8 @@ from slam.slam import SLAM
 from scene.dataset_readers import get_dataset_reader, DatasetReader
 from scene.preprocessing import Preprocessor
 from rich.progress import track
+from utils.config_utils import TrajectoryReaderType
+from utils.trajectory_utils import trajectory_reader_available
 import rerun as rr
 from rich.console import Console
 
@@ -60,6 +65,7 @@ def slam_main(ctx: typer.Context,
                                         description="Processing frames"):
         frame = preprocessor(cloud, timestamp, pose)
         slam_module.process(frame)
+        break
 
     results_dir = slam_module.save_results()
     console.print(":partying_face: [bold][green]Completed![/green][/bold]")
@@ -84,8 +90,10 @@ def mesh_main(input_filename: Path,
               output_filename: Path | None = None,
               verbose: Annotated[bool, typer.Option(
                   "--verbose", "-v")] = False,
-              p_depth: Annotated[int, typer.Option(
+              p_depth: Annotated[int | None, typer.Option(
                   "--poisson-depth", "-d")] = 10,
+              p_width: Annotated[float | None, typer.Option(
+                  "--poisson-width", "-w")] = None,
               p_density_min: Annotated[float, typer.Option(
                   "--poisson-density-min", "-m")] = 0.05,
               kf_interval: Annotated[int, typer.Option(
@@ -112,7 +120,8 @@ def mesh_main(input_filename: Path,
     except FileNotFoundError as e:
         logger.error(e)
         exit(-1)
-    logger.info(f":white_check_mark: Loaded graph with {len(graph.models)} models "
+    logger.info(":white_check_mark: "
+                f"Loaded graph with {len(graph.models)} models "
                 f"and {len(graph.frames)} frames.")
 
     cfg = load_configuration(graph_dir / "cfg.yaml")
@@ -120,20 +129,110 @@ def mesh_main(input_filename: Path,
         graph, cfg, graph_dir,
         kf_interval=kf_interval, kf_samples=kf_samples,
         min_opacity=min_opacity, poisson_depth=p_depth,
-        poisson_min_density=p_density_min,
+        poisson_width=p_width, poisson_min_density=p_density_min,
         max_depth_dist=max_depth_dist,
         use_median_depth=median_depth)
     logger.info(mesh)
-    raise NotImplementedError("Not done yet")
+    if output_filename is None:
+        mesh_dir = graph_dir / "meshes"
+        mesh_dir.mkdir(parents=True, exist_ok=True)
+        date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_filename = mesh_dir / (date + ".ply")
+    else:
+        mesh_dir = output_filename.parent
+        mesh_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving mesh at {output_filename}")
+    o3d.io.write_triangle_mesh(output_filename, mesh,
+                               write_vertex_normals=True)
 
 
 @app.command("eval_trajectory",
              short_help="Evaluate the RPE of an estimated trajectory "
              "against the reference.")
-def eval_trajectory(estimate_filename: Path, reference_filename: Path,
-                    output_filename: Path):
-    raise NotImplementedError("Not yet done!")
-    ...
+def eval_trajectory(estimate_filename: Path,
+                    reference_filename: Path | None = None,
+                    estimate_format: TrajectoryReaderType | None = None,
+                    reference_format: TrajectoryReaderType | None = None,
+                    cfg_filename: Path | None = None,
+                    kitti_timestamps: Path | None = None,
+                    output_filename: Path | None = None,
+                    verbose: Annotated[bool, typer.Option(
+                        "--verbose", "-v")] = False):
+    safe_state()
+    set_log_level(verbose)
+    if estimate_filename.is_dir():
+        estimate_dir = estimate_filename
+        estimate_filename = estimate_dir / "odom.txt"
+    else:
+        estimate_dir = estimate_filename.parent
+    logger.info(f"Reading estimate {estimate_filename}")
+    # Verify that the user has passed the minimal set of informations
+    # Try reading configuration file to get the following info:
+    # 1) GT trajectory file
+    # 2) GT trajectory format
+    # 3) estimate format
+    if cfg_filename is None:
+        cfg_filename = estimate_dir / "cfg.yaml"
+    logger.info(f"Attempting to reader configuration file at {cfg_filename}")
+    try:
+        cfg = load_configuration(cfg_filename)
+        cfg_found = True
+        logger.info(
+            "[green]Found configuration![/green] Reading additional "
+            "metadata from there")
+    except FileNotFoundError as e:
+        logger.warning(e)
+        cfg_found = False
+
+    treader_estimate = None
+    treader_reference = None
+    if cfg_found:
+        # Build dataset reader to extract treader_reference
+        treader_reference = get_dataset_reader(cfg).traj_reader
+        est_tcfg = TrajectoryReaderConfig(reader_type=cfg.output.writer,
+                                          filename=estimate_filename,
+                                          gt_T_sensor_kitti_filename=None,
+                                          gt_T_sensor_t_xyz_q_xyzw=None)
+        treader_estimate = trajectory_reader_available[est_tcfg.reader_type](
+            est_tcfg)
+        reference_filename = cfg.data.trajectory_reader.filename
+    else:
+        assert estimate_format and estimate_filename and \
+            reference_format and reference_filename
+        treader_estimate = trajectory_reader_available[estimate_format](
+            TrajectoryReaderConfig(reader_type=estimate_format,
+                                   filename=estimate_filename,
+                                   gt_T_sensor_kitti_filename=None,
+                                   gt_T_sensor_t_xyz_q_xyzw=None,
+                                   timestamp_from_filename_kitti=kitti_timestamps))
+        treader_reference = trajectory_reader_available[reference_format](
+            TrajectoryReaderConfig(reader_type=reference_format,
+                                   filename=reference_filename,
+                                   gt_T_sensor_kitti_filename=None,
+                                   gt_T_sensor_t_xyz_q_xyzw=None,
+                                   timestamp_from_filename_kitti=kitti_timestamps))
+    if len(treader_estimate.poses) != len(treader_reference.poses):
+        logger.warning(f"No. estimated poses ({len(treader_estimate.poses)}) "
+                       "differs from "
+                       f"No. reference poses ({len(treader_reference.poses)})."
+                       " for KITTI-like datasets, this leads to ambiguities "
+                       "during evaluation")
+    rpe_results = evaluate_rpe(estimated_trajectory=treader_estimate.poses,
+                               timestamps=treader_estimate.timestamps,
+                               gt_trajectory=treader_reference.poses,
+                               gt_timestamps=treader_reference.timestamps)
+
+    res_dict = {
+        "estimate": str(estimate_filename),
+        "reference": str(reference_filename),
+        "rpe-mean": rpe_results[0],
+        "rpe-stdev": rpe_results[1]
+    }
+    logger.info(res_dict)
+    if output_filename is None:
+        output_filename = estimate_dir / "evaluation_rpe.yaml"
+    logger.info(f"Saving results in {output_filename}")
+    save_configuration(output_filename, res_dict)
 
 
 @app.command("eval_mapping",
@@ -143,8 +242,8 @@ def eval_trajectory(estimate_filename: Path, reference_filename: Path,
              "cloud.")
 def eval_mapping(estimate_filename: list[Path], reference_filename: Path,
                  output_filename: Path):
+
     raise NotImplementedError("Not yet done!")
-    ...
 
 
 @app.command("crop_reference_pcd",
@@ -154,7 +253,6 @@ def crop_intersection(estimate_filenames: list[Path],
                       reference_filename: Path,
                       output_filename: Path):
     raise NotImplementedError("Not yet done!")
-    ...
 
 
 @app.command("generate_dummy_cfg",

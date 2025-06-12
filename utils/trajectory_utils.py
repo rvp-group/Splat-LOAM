@@ -4,6 +4,7 @@ from pytransform3d.rotations import (
     norm_matrix
 )
 import re
+from utils.pointcloud_utils import read_timestamps
 from pytransform3d.transformations import (transform_from_pq, check_transform)
 import numpy as np
 from pathlib import Path
@@ -84,6 +85,9 @@ class TrajectoryReader_KITTI(TrajectoryReader):
             pose = pose_vect.reshape(3, 4)
             pose = np.vstack((pose, [0, 0, 0, 1]))
             self.poses.append(pose)
+        if config.timestamp_from_filename_kitti is not None:
+            self.timestamps = read_timestamps(
+                config.timestamp_from_filename_kitti)
 
     def __call__(self, _: float, *args, **kwargs) -> np.ndarray:
         raise RuntimeError(
@@ -110,7 +114,7 @@ class TrajectoryReader_TUM(TrajectoryReader):
                 continue
             line = re.sub(" {2,}", " ", line)  # fix double spaces
             pose_vect = np.array([float(x) for x in re.split(" |, ", line)])
-            self.timestamps.append(pose_vect[0])
+            self.timestamps.append(pose_vect[0].item())
             pq = pose_vect[1:]
             pq[3:] = quaternion_wxyz_from_xyzw(pq[3:])
             self.poses.append(transform_from_pq(pq))
