@@ -1,5 +1,10 @@
 import typer
-from utils.eval_utils import evaluate_rpe
+import pandas as pd
+from utils.eval_utils import (
+    evaluate_rpe,
+    evaluate_recon,
+    crop_union
+)
 import open3d as o3d
 from datetime import datetime
 from scene.postprocessing import ResultGraph, mesh_poisson
@@ -15,7 +20,7 @@ from scene.dataset_readers import get_dataset_reader, DatasetReader
 from scene.preprocessing import Preprocessor
 from rich.progress import track
 from utils.config_utils import TrajectoryReaderType
-from utils.trajectory_utils import trajectory_reader_available
+from utils.trajectory_utils import trajectory_reader_available, TrajectoryReader_KITTI
 import rerun as rr
 from rich.console import Console
 
@@ -84,8 +89,15 @@ def slam_main(ctx: typer.Context,
 
 
 @app.command("mesh",
-             short_help="Generate a mesh of the environment from the "
-             "SLAM output")
+             short_help="Extract a mesh from the SLAM output",
+             help="""
+               Extract a mesh from the SLAM output.
+               The application runs Poisson Surface reconstruction over
+               a set of points
+               sampled from the Gaussian Model at keyframe poses.
+               Additional tunings can be set via CLI.
+               We provide a default configuration that trades some accuracy for
+               speed, so that you don't wait too long for your mesh""")
 def mesh_main(input_filename: Path,
               output_filename: Path | None = None,
               verbose: Annotated[bool, typer.Option(
@@ -146,9 +158,32 @@ def mesh_main(input_filename: Path,
                                write_vertex_normals=True)
 
 
-@app.command("eval_trajectory",
+@app.command("eval_odom",
              short_help="Evaluate the RPE of an estimated trajectory "
-             "against the reference.")
+             "against the reference.",
+             help="""
+             Evaluate the RPE of an estimated trajectory against the reference.
+             The RPE is evaluated across several lengths to provide a
+             more meaningful results
+              (See paper for more details).
+             If you included the reference trajectory in the slam
+             configuration file, you can simply
+             run the application as follows:
+
+             python3 run.py eval_trajectory <result_folder>
+
+
+
+             Otherwise, additional info are required to perform evaluation,
+              namely:
+
+                1) reference path
+
+                2) reference format (kitti, tum, etc)
+
+                3) kitti times.txt file (if reference is using kitti)
+             """
+             )
 def eval_trajectory(estimate_filename: Path,
                     reference_filename: Path | None = None,
                     estimate_format: TrajectoryReaderType | None = None,
@@ -156,6 +191,7 @@ def eval_trajectory(estimate_filename: Path,
                     cfg_filename: Path | None = None,
                     kitti_timestamps: Path | None = None,
                     output_filename: Path | None = None,
+                    save: bool = True,
                     verbose: Annotated[bool, typer.Option(
                         "--verbose", "-v")] = False):
     safe_state()
@@ -217,6 +253,11 @@ def eval_trajectory(estimate_filename: Path,
                        f"No. reference poses ({len(treader_reference.poses)})."
                        " for KITTI-like datasets, this leads to ambiguities "
                        "during evaluation")
+        if isinstance(treader_reference, TrajectoryReader_KITTI):
+            logger.error(
+                "Premptively stopping the execution since reference "
+                "is in KITTI format.")
+            exit(-1)
     rpe_results = evaluate_rpe(estimated_trajectory=treader_estimate.poses,
                                timestamps=treader_estimate.timestamps,
                                gt_trajectory=treader_reference.poses,
@@ -229,30 +270,114 @@ def eval_trajectory(estimate_filename: Path,
         "rpe-stdev": rpe_results[1]
     }
     logger.info(res_dict)
-    if output_filename is None:
-        output_filename = estimate_dir / "evaluation_rpe.yaml"
-    logger.info(f"Saving results in {output_filename}")
-    save_configuration(output_filename, res_dict)
+    if save:
+        if output_filename is None:
+            output_filename = estimate_dir / "evaluation_rpe.csv"
+        logger.info(f"Saving results in {output_filename}")
+        df = pd.DataFrame(res_dict, index=[0])
+        df.to_csv(output_filename, index=False)
+    console.print("[green]TLDR: "
+                  f"RPE={res_dict['rpe-mean']:.5f} "
+                  f"+- {res_dict['rpe-stdev']:.5f}"
+                  "[/green]")
 
 
-@app.command("eval_mapping",
-             short_help="Evaluate the mapping metrics "
+@app.command("eval_recon",
+             short_help="Evaluate the 3D Reconstruction metrics "
              "(Accuracy, Completeness, Charmfer-L1, F1-score) "
              "of one or more estimated mesh against the reference point "
-             "cloud.")
-def eval_mapping(estimate_filename: list[Path], reference_filename: Path,
-                 output_filename: Path):
+             "cloud.",
+             help="""
+             Evaluate the 3D Reconstruction metrics of an aligned mesh against
+             a reference point cloud.
 
-    raise NotImplementedError("Not yet done!")
+            If comparing against other methods, use the reference pcd
+            computed via the crop_union command!
+
+            i.e.
+
+            python3 run.py crop_union <ref_pcd> <mesh_a> <mesh_b> <mesh_c>
+            <ref_pcd_crop>
+
+            python3 run.py eval_recon <ref_pcd_crop> <mesh_a>
+
+            python3 run.py eval_recon <ref_pcd_crop> <mesh_b>
+
+            etc
+
+             We provide the default parameters we used for the experiments
+             shown in the paper.
+             Additional information on the arguments are provided
+             in <utils.eval_utils:evaluate_recon>
+             """)
+def eval_mapping(reference_filename: Path,
+                 estimate_filename: Path,
+                 output_filename: Path | None = None,
+                 down_sample_res: float = 0.02,
+                 threshold: float = 0.2,
+                 truncation_acc: float = 0.5,
+                 truncation_com: float = 0.5,
+                 gt_bbox_mask_on: bool = True,
+                 mesh_sample_point: int = 10_000_000,
+                 generate_error_map: bool = False,
+                 save: bool = True,
+                 verbose: Annotated[bool, typer.Option(
+                     "--verbose", "-v")] = False):
+    safe_state()
+    set_log_level(verbose)
+    metrics = evaluate_recon(reference_filename,
+                             estimate_filename,
+                             down_sample_res=down_sample_res,
+                             threshold=threshold,
+                             truncation_acc=truncation_acc,
+                             truncation_com=truncation_com,
+                             gt_bbox_mask_on=gt_bbox_mask_on,
+                             mesh_sample_point=mesh_sample_point,
+                             generate_error_map=generate_error_map)
+    row = {
+        "mesh": estimate_filename.stem,
+        "threshold": threshold,
+        "truncation_acc": truncation_acc,
+        **metrics
+    }
+    logger.info(row)
+    if save:
+        if output_filename is None:
+            date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            output_filename = f"eval_recon_{date}.csv"
+        logger.info(f"Saving results to {output_filename}")
+        pd.DataFrame(row, index=[0]).to_csv(output_filename, index=False)
+    console.print("[green]TLDR:"
+                  f"Acc={row['MAE_accuracy (cm)']:.3f} "
+                  f"Com={row['MAE_completeness (cm)']:.3f} "
+                  f"C-L1={row['Chamfer_L1 (cm)']:.3f} "
+                  f"F-score={row['F-score (%)']:.3f}"
+                  "[/green]")
 
 
-@app.command("crop_reference_pcd",
+@app.command("crop_recon",
              short_help="Crop the reference point cloud given a set of "
              "estimated meshes. Useful for multi-approach evaluation")
-def crop_intersection(estimate_filenames: list[Path],
-                      reference_filename: Path,
-                      output_filename: Path):
-    raise NotImplementedError("Not yet done!")
+def crop_recon(reference_filename: Path,
+               estimate_filenames: list[Path],
+               output_filename: Path | None = None,
+               threshold_dist: float = 1.2,
+               mesh_sample_point: int = 10_000_000,
+               verbose: Annotated[bool, typer.Option(
+                   "--verbose", "-v")] = False):
+    safe_state()
+    set_log_level(verbose)
+    reference_crop = crop_union(reference_filename,
+                                estimate_filenames,
+                                threshold_dist=threshold_dist,
+                                mesh_sample_point=mesh_sample_point)
+    if output_filename is None:
+        date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_filename = Path(f"{reference_filename.stem}_crop_{date}.ply")
+    logger.info(f"Saving results to {output_filename}")
+    output_filename.parent.mkdir(exist_ok=True, parents=True)
+    o3d.io.write_point_cloud(output_filename, reference_crop)
+    console.print(":white_check_mark: Cropping complete")
 
 
 @app.command("generate_dummy_cfg",
