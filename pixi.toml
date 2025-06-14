@@ -2,23 +2,35 @@
 name = "Splat-LOAM"
 version = "0.1.0"
 authors = ["Emanuele Giacomini <giacomini@diag.uniroma1.it>"]
-channels = ["nvidia/label/cuda-11.8.0", "conda-forge"]
+channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 
 [tasks]
 
 [system-requirements]
-libc = "2.31" # Minimum required version for Open3d
+libc = { family = "glibc", version = "2.31" } # Minimum required version for Open3d
+cuda = "12.6"
+
+[build-dependencies]
+ninja = "*"
+cuda-toolkit = "12.6.*"
+pytorch = ">=2.5.1"
+eigen = ">=3.4.0,<4"
 
 [dependencies]
 python = ">=3.11,<3.13"
 pip = ">=25.1.1,<26"
+cuda-version = "12.6.*"
 
+[pypi-options]
+no-build-isolation = [
+  "diff-surfel-spherical-rasterization",
+  "gsaligner",
+  "simple-knn",
+]
 
 [pypi-dependencies]
 omegaconf = ">=2.3.0, <3"
-torch = {version = ">=2.5.1", index = "https://download.pytorch.org/whl/cu118"}
-torchvision = {version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu118"}
 pytransform3d = ">=3.14.0, <4"
 open3d = "==0.19"
 rosbags = ">=0.10.9, <0.11"
@@ -26,4 +38,9 @@ natsort = ">=8.4.0, <9"
 typer = ">=0.15.3, <0.16"
 pyprojections = ">=0.0.3, <0.0.4"
 setuptools = "*"
-
+diff-surfel-spherical-rasterization = { path = "./submodules/diff-surfel-spherical-rasterization/" }
+gsaligner = { path = "./submodules/gsaligner/" }
+simple-knn = { path = "./submodules/simple-knn/" }
+evo = ">=1.31.1, <2"
+plyfile = ">=1.1.2, <2"
+rerun-sdk = ">=0.23.3, <0.24"
