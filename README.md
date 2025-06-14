@@ -255,4 +255,7 @@ If you use Splat-LOAM for your research, please cite (currently in preprint):
 }
 ```
 # Contacts
+If you have questions or suggestions, we invite you to open an issue!
+Additionally, you can contact:
 
+- Emanuele Giacomini : `giacomini@diag.uniroma1.it`
