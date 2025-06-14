@@ -30,7 +30,7 @@ git clone --recursive https://github.com/rvp-group/Splat-LOAM.git
   ```
 
 To run Splat-LOAM, you strictly need an NVIDIA GPU with CUDA capabilities.
-The implementation has been tested with `CUDA 11.8`, however, higher versions should be compatible.
+The implementation has been tested with CUDA versions `11.8` and `12.6`, however, other versions should be compatible
 
 Moreover, depending on how you intend to run the implementation, you might need:
 - **Docker** and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 
@@ -56,8 +56,8 @@ While in the container, everything you need will be found in the `/workspace` fo
 
 *For who's interested in development: you can change code in the host repository without restarting the container which is quite handy. We still need a way to make LSP work, if you have any tips, get in contact with us!*
 ### 2. Pixi
->[!WARNING]
->Still WIP, will be fixed in the next few days!
+>[!NOTE]
+> Pixi configuration uses CUDA 12.6 while the Docker configuration uses CUDA 11.8. It shouldn't create any issues but its worth noticing this. 
 
 Assuming that you already installed Pixi, simply run
 ```sh
@@ -146,10 +146,9 @@ data:
     filename: /path/to/trajectory.tum
 ```
 And it's done. As long as the data remains consistent, the `DatasetReader` will handle the extra parameters (extrinsics, rosbag topics, formats, etc).
-> [!NOTE]
-> GT trajectory is optional unless `tracking.method=gt` is set. If available, it's used for initial guess alignment only and for evaluation metadata retrival.
 
->[!NOTE]
+>GT trajectory is optional unless `tracking.method=gt` is set. If available, it's used for initial guess alignment only and for evaluation metadata retrival.
+>
 > More details on what each DatasetReader does, can be found in `scene.dataset_reader.py`
 
 More details will be provided in the documentation (WIP)
@@ -188,7 +187,6 @@ logging:
     rerun_connect_grpc_url: <str> # serve log-data over gRPC to an already instantiated viewer.
   ```
 
-> [!NOTE]
 > The Gaussian model observed in rerun is not rendered with the 2DGS rasterizer. Don't worry if it looks different from the rasterized images.
 
 </details>
