@@ -1,0 +1,28 @@
+inherit_from: configs/ncd/ncd.yaml
+data:
+  dataset_type: ncd 
+  cloud_reader:
+    cloud_folder: /workspace/data/newer_college/quad_easy/
+  trajectory_reader:
+    filename: /workspace/data/newer_college/quad_easy/gt-nc-quad-easy.csv
+  skip_clouds_wno_sync: False
+mapping:
+  num_iterations: 200
+  densify_threshold_egeom: -1
+  densify_threshold_opacity: 0.2
+  densify_percentage: 0.3
+  prob_view_last_keyframe: null
+  pruning_min_opacity: 0.1
+  pruning_min_size: 0.0
+  pruning_max_size: 1.0
+  opt_lambda_alpha: 0.4
+  opt_lambda_normal: 0.5
+  opt_scaling_max: 0.1
+  opt_scaling_max_penalty: 1.0
+  lmodel_threshold_ngaussians: null
+  lmodel_threshold_nkeyframes: null
+tracking:
+  method: gsaligner
+  keyframe_threshold_distance: 5.0
+  keyframe_threshold_fitness: 0.30
+  keyframe_threshold_nframes: -1

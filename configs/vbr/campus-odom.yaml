@@ -1,0 +1,28 @@
+inherit_from: configs/vbr/vbr.yaml
+data:
+  dataset_type: vbr
+  cloud_reader:
+    cloud_folder: /workspace/data/vbr/vbr_slam/campus/campus_train0
+  trajectory_reader:
+    filename: /workspace/data/vbr/vbr_slam/campus/campus_train0/campus_train0_gt.txt
+  skip_clouds_wno_sync: False
+mapping:
+  num_iterations: 200
+  densify_threshold_egeom: -1
+  densify_threshold_opacity: 0.2
+  densify_percentage: 0.15
+  prob_view_last_keyframe: null
+  pruning_min_opacity: 0.1
+  pruning_min_size: 0.0
+  pruning_max_size: 1.0
+  opt_lambda_alpha: 0.2
+  opt_lambda_normal: 0.5
+  opt_scaling_max: 0.25
+  opt_scaling_max_penalty: 1.0
+  lmodel_threshold_ngaussians: null
+  lmodel_threshold_nkeyframes: 100
+tracking:
+  method: gsaligner
+  keyframe_threshold_distance: 5.0
+  keyframe_threshold_fitness: 0.30
+  keyframe_threshold_nframes: -1

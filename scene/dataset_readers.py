@@ -1,4 +1,5 @@
 from utils.pointcloud_utils import pointcloud_reader_available
+import numpy as np
 import copy
 from utils.trajectory_utils import trajectory_reader_available
 from pathlib import Path
@@ -17,6 +18,9 @@ from utils.trajectory_utils import (
     TrajectoryReader_VILENS,
     TrajectoryReader_NULL
 )
+from utils.logging_utils import get_logger
+
+logger = get_logger("")
 
 
 class DatasetReader:
@@ -31,13 +35,35 @@ class DatasetReader:
         (cloud, timestamp, associated_gt_pose)
     """
 
-    def __init__(self, config: Configuration):
+    def __init__(self, cfg: Configuration):
+        self.cfg = cfg
         self.cloud_reader: PointCloudReader = None
         self.traj_reader: TrajectoryReader = None
 
     def __next__(self):
+        while True:
+            cloud, timestamp = next(self.cloud_reader)
+
+            try:
+                gt_pose = self.traj_reader(timestamp)
+                return cloud, timestamp, gt_pose
+
+            except RuntimeError as e:
+                if self.cfg.data.skip_clouds_wno_sync is True:
+                    logger.warning(
+                        f"{e} | Skipping unsynchronized cloud at {timestamp}")
+                else:
+                    logger.warning(
+                        f"{e} | Setting gt_pose as identity")
+                    return cloud, timestamp, np.eye(4)
+
         cloud, timestamp = next(self.cloud_reader)
-        gt_pose = self.traj_reader(timestamp)
+        try:
+            gt_pose = self.traj_reader(timestamp)
+        except RuntimeError as e:
+            self.cfg.data.skip_clouds_wno_sync
+            logger.warning(f"{e} | Setting gt_pose as identity")
+            gt_pose = np.eye(4)
         return cloud, timestamp, gt_pose
 
     def __len__(self):
@@ -49,7 +75,9 @@ class DatasetReader_KITTI(DatasetReader):
     Reader for KITTI dataset.
     To use this reader, set the
     data.cloud_reader.cloud_folder to the base folder of
-    a kitti sequence (i.e. folder containing velodyne and times.txt)
+    a kitti sequence (i.e. folder containing velodyne and times.txt) and,
+    if available, the data.trajectory_reader.filename to the corresponding
+    ground truth trajectory file.
 
     When queried, the reader returns a tuple containing:
         (cloud, timestamp, associated_gt_pose)
@@ -66,6 +94,7 @@ class DatasetReader_KITTI(DatasetReader):
             pc_cfg.timestamp_filename = base_folder / "times.txt"
         self.cloud_reader = PointCloudReader_BIN(pc_cfg)
         tr_cfg = config.data.trajectory_reader
+        tr_cfg.gt_T_sensor_kitti_filename = base_folder / "calib.txt"
         if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
         else:
@@ -237,7 +266,7 @@ class DatasetReader_OXSPIRES_VILENS(DatasetReader):
         self.cloud_reader = PointCloudReader_PCD(pc_cfg)
 
         tr_cfg = config.data.trajectory_reader
-        tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0, 0, 0.124, 0, 0, 1, 0]
+        tr_cfg.gt_T_sensor_t_xyz_q_xyzw = [0, 0, 0, 0, 0, 0, 1]
         if tr_cfg.filename is None or (not Path(tr_cfg.filename).is_file()):
             self.traj_reader = TrajectoryReader_NULL(tr_cfg)
         else:

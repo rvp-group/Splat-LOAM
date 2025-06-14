@@ -100,7 +100,7 @@ class PointCloudReader_PLY(PointCloudReader_Collections):
 
     def __init__(self, config: PointCloudReaderConfig):
         PointCloudReader_Collections.__init__(self, config)
-        self.filenames = sorted(Path(config.cloud_folder).glob(".ply"))
+        self.filenames = sorted(Path(config.cloud_folder).glob("*.ply"))
         self.n_clouds = len(self.filenames)
 
     def __iter__(self):
@@ -122,8 +122,9 @@ class PointCloudReader_PCD(PointCloudReader_Collections):
 
     def __init__(self, config: PointCloudReaderConfig):
         PointCloudReader_Collections.__init__(self, config)
-        self.filenames = sorted(Path(config.cloud_folder).glob(".pcd"))
+        self.filenames = sorted(Path(config.cloud_folder).glob("*.pcd"))
         self.n_clouds = len(self.filenames)
+        logger.info(f"Found {self.n_clouds} pcd clouds")
 
     def __iter__(self):
         return self
@@ -145,11 +146,13 @@ class PointCloudReader_ROSBAG(PointCloudReader):
         PointCloudReader.__init__(self, config)
         self.bag = None
         if Path(config.cloud_folder).is_file():
+            logger.debug(f"Opening rosbag: {config.cloud_folder}")
             self.bag = AnyReader([Path(config.cloud_folder)])
         else:
             bag_filenames = natsort.natsorted(
                 [bag for bag in list(Path(config.cloud_folder).glob("*.bag"))]
             )
+            logger.debug(f"Opening rosbags: {bag_filenames}")
             self.bag = AnyReader(bag_filenames)
 
         self.bag.open()

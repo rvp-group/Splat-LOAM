@@ -33,15 +33,25 @@ class TrajectoryReader:
             gt_T_s_pq[3:] = quaternion_wxyz_from_xyzw(gt_T_s_pq[3:])
             self.gt_T_s = transform_from_pq(gt_T_s_pq)
         elif config.gt_T_sensor_kitti_filename is not None:
-            raise RuntimeError(
-                "Reading calib from kitti calibration file is not yet\
-                    supported.")
+            with open(config.gt_T_sensor_kitti_filename) as f:
+                for line in f.readlines():
+                    if "Tr:" not in line:
+                        continue
+                    else:
+                        line = line[3:]
+                        pose_vect = np.array([float(x) for x in line.split()])
+                        pose = pose_vect.reshape(3, 4)
+                        pose = np.vstack((pose, [0, 0, 0, 1]))
+                        self.gt_T_s = pose
         else:
             # Assuming gt_T_lidar as identity
             self.gt_T_s = np.eye(4)
 
     def __call__(self, timestamp: float, *args, **kwargs) -> np.ndarray:
-        idx = self._find_closest_timestamp_idx(timestamp)
+        try:
+            idx = self._find_closest_timestamp_idx(timestamp)
+        except RuntimeError as e:
+            raise e
         return self.poses[idx] @ self.gt_T_s
 
     def __iter__(self):

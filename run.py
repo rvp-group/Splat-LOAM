@@ -1,3 +1,4 @@
+from rich.terminal_theme import DEFAULT_TERMINAL_THEME
 import typer
 import pandas as pd
 from utils.eval_utils import (
@@ -20,7 +21,10 @@ from scene.dataset_readers import get_dataset_reader, DatasetReader
 from scene.preprocessing import Preprocessor
 from rich.progress import track
 from utils.config_utils import TrajectoryReaderType
-from utils.trajectory_utils import trajectory_reader_available, TrajectoryReader_KITTI
+from utils.trajectory_utils import (
+    trajectory_reader_available,
+    TrajectoryReader_KITTI
+)
 import rerun as rr
 from rich.console import Console
 
@@ -70,7 +74,6 @@ def slam_main(ctx: typer.Context,
                                         description="Processing frames"):
         frame = preprocessor(cloud, timestamp, pose)
         slam_module.process(frame)
-        break
 
     results_dir = slam_module.save_results()
     console.print(":partying_face: [bold][green]Completed![/green][/bold]")
@@ -81,10 +84,10 @@ def slam_main(ctx: typer.Context,
         "Refer to mesh command for additional arguments:\n"
         f"\t[bold]python3 run.py mesh --help[/bold]\n\n"
         "If you want to [yellow]evaluate the odometry[/yellow] results, try:\n"
-        f"\t[bold][yellow]python3 run.py eval_trajectory "
+        f"\t[bold][yellow]python3 run.py eval_odom "
         f"{results_dir}[/yellow][/bold]\n"
         "Refer to trajectory eval command for additional arguments:\n"
-        "\t[bold]python3 run.py eval_trajectory --help[/bold]\n"
+        "\t[bold]python3 run.py eval_odom --help[/bold]\n"
     )
 
 
@@ -107,7 +110,7 @@ def mesh_main(input_filename: Path,
               p_width: Annotated[float | None, typer.Option(
                   "--poisson-width", "-w")] = None,
               p_density_min: Annotated[float, typer.Option(
-                  "--poisson-density-min", "-m")] = 0.05,
+                  "--poisson-density-min", "-m")] = 0.01,
               kf_interval: Annotated[int, typer.Option(
                   "--kf-interval", "-i")] = -1,
               kf_samples: Annotated[int, typer.Option(
@@ -223,6 +226,7 @@ def eval_trajectory(estimate_filename: Path,
     treader_estimate = None
     treader_reference = None
     if cfg_found:
+        logger.info("Using Configuration for trajectory readers")
         # Build dataset reader to extract treader_reference
         treader_reference = get_dataset_reader(cfg).traj_reader
         est_tcfg = TrajectoryReaderConfig(reader_type=cfg.output.writer,
@@ -232,21 +236,30 @@ def eval_trajectory(estimate_filename: Path,
         treader_estimate = trajectory_reader_available[est_tcfg.reader_type](
             est_tcfg)
         reference_filename = cfg.data.trajectory_reader.filename
-    else:
-        assert estimate_format and estimate_filename and \
-            reference_format and reference_filename
+    if estimate_filename and estimate_format:
+        logger.info("initializing estimate trajectory reader from:"
+                    f"{estimate_filename} with format {estimate_format}")
         treader_estimate = trajectory_reader_available[estimate_format](
             TrajectoryReaderConfig(reader_type=estimate_format,
                                    filename=estimate_filename,
                                    gt_T_sensor_kitti_filename=None,
                                    gt_T_sensor_t_xyz_q_xyzw=None,
                                    timestamp_from_filename_kitti=kitti_timestamps))
+    if reference_filename and reference_format:
+        logger.info("initializing reference trajectory reader from:"
+                    f"{reference_filename} with format {reference_format}")
         treader_reference = trajectory_reader_available[reference_format](
             TrajectoryReaderConfig(reader_type=reference_format,
                                    filename=reference_filename,
                                    gt_T_sensor_kitti_filename=None,
                                    gt_T_sensor_t_xyz_q_xyzw=None,
                                    timestamp_from_filename_kitti=kitti_timestamps))
+    if treader_reference is None:
+        raise RuntimeError(
+            "Could not instantiate reference trajectory reader.")
+    if treader_estimate is None:
+        raise RuntimeError("Could not instantiate estimate trajectory reader.")
+
     if len(treader_estimate.poses) != len(treader_reference.poses):
         logger.warning(f"No. estimated poses ({len(treader_estimate.poses)}) "
                        "differs from "
@@ -402,13 +415,21 @@ def pipeline_sanity_check(cfg: Configuration,
     # TrajectoryReader is not null
     if cfg.tracking.method == TrackingMethod.gt and \
             isinstance(data_loader.traj_reader, TrajectoryReader_NULL):
-        raise RuntimeError("Tracking method is set to GT but DatasetReader has"
-                           " TrajectoryReader_NULL set. "
-                           "Verify input trajectory file.")
+        logger.error("Tracking method is set to gt but trajectory reader is of type"
+                     " TrajectoryReader_NULL. Verify input trajectory file.")
+        exit(-1)
+    if cfg.tracking.method == TrackingMethod.gt and \
+            cfg.data.skip_clouds_wno_sync is False:
+        logger.error("Tracking method is set to gt but "
+                     "data.skip_clouds_wno_sync is False."
+                     "Aborting the run to avoid integrating wrong"
+                     " measurements.")
+        exit(-1)
     # Add other checks here before running the pipeline
     ...
     return
 
 
 if __name__ == "__main__":
+
     app()

@@ -36,3 +36,5 @@ RUN pip install rosbags typer[all] omegaconf matplotlib pytransform3d \
 RUN chmod -R 777 /workspace
 USER $UNAME
 
+WORKDIR /workspace/repository
+

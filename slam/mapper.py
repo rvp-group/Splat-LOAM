@@ -12,6 +12,7 @@ from scene.frame import Frame
 from gaussian_renderer import render
 from simple_knn._C import distCUDA2
 import utils.sampling_utils as samplers
+from utils.logging_backends import get_datalogger
 
 logger = get_logger("mapper")
 
@@ -20,6 +21,7 @@ class Mapper:
     def __init__(self, cfg: Configuration):
         self.cfg = cfg
         self.model: LocalModel = None
+        self.data_logger = get_datalogger(self.cfg)
 
     def register_model(self, model: LocalModel) -> None:
         """
@@ -94,6 +96,7 @@ class Mapper:
         densify_mask_sampled = torch.zeros_like(densify_mask)
         densify_mask_sampled[candidates[sampled_indices, 0],
                              candidates[sampled_indices, 1]] = 1.0
+        self.data_logger.log_image("frame/densify_mask", densify_mask_sampled)
 
         # Generate point cloud for densifications
         points = depth_to_points(frame.camera,

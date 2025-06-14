@@ -54,8 +54,7 @@ class TrajectoryReaderConfig:
     # kinda required for evaluation! (DatasetReader does this for you)
     timestamp_from_filename_kitti: Optional[str] = None
     # If gt_T_sensor is provided as pos-quat, set this variable
-    gt_T_sensor_t_xyz_q_xyzw: Optional[tuple[float]] = field(
-        default_factory=tuple)
+    gt_T_sensor_t_xyz_q_xyzw: Optional[tuple[float]] = None
     # If gt_T_sensor is provided via KITTI calibration file
     # set this variable
     gt_T_sensor_kitti_filename: Optional[str] = None
@@ -106,7 +105,7 @@ class MappingConfig:
     pruning_min_opacity: float = 0.0
     pruning_min_size: Optional[float] = 0.0
     pruning_max_size: Optional[float] = 1.0
-    early_stop_enable: Optional[bool] = True
+    early_stop_enable: Optional[bool] = False
     early_stop_patience: Optional[int] = 100
     early_stop_threshold: Optional[float] = 0.01
     opt_lambda_alpha: float = 1e-1
@@ -116,7 +115,9 @@ class MappingConfig:
     # Penalty for higher scaling factors
     opt_scaling_max_penalty: float = 0.2
 
-    lmodel_threshold_ngaussians: Optional[int] = None
+    # max no. gaussians per local model
+    lmodel_threshold_ngaussians: Optional[int] = 150000
+    # max no. keyframes per local model
     lmodel_threshold_nkeyframes: Optional[int] = None
 
 
@@ -143,6 +144,9 @@ class DatasetConfig:
         field(default_factory=TrajectoryReaderConfig)
     cloud_reader: Optional[PointCloudReaderConfig] = \
         field(default_factory=PointCloudReaderConfig)
+    # This should be used only for mapping scenarios in which you
+    # may want to discard clouds that have no associated pose.
+    skip_clouds_wno_sync: Optional[bool] = False
 
 
 @dataclass

@@ -1,0 +1,48 @@
+preprocessing:
+  image_height: 128
+  image_width: 1024
+  depth_min: 1.0
+  depth_max: 60.0
+  enable_normal_estimation: false
+  enable_ground_segmentation: false
+output:
+  folder: null
+  writer: tum
+logging:
+  enable: true
+  logger_type: rerun
+  rerun_spawn: true
+  rerun_serve_grpc: false
+  rerun_connect_grpc_url: null
+mapping:
+  num_iterations: 300
+  densify_threshold_egeom: -1.0
+  densify_threshold_opacity: 0.5
+  densify_percentage: 0.15
+  prob_view_last_keyframe: 0.4
+  pruning_min_opacity: 0.0
+  pruning_min_size: 0.0
+  pruning_max_size: 1.0
+  early_stop_enable: false
+  early_stop_patience: 100
+  early_stop_threshold: 0.01
+  opt_lambda_alpha: 0.1
+  opt_lambda_normal: 0.1
+  opt_scaling_max: 0.5
+  opt_scaling_max_penalty: 0.2
+  lmodel_threshold_ngaussians: 150000
+  lmodel_threshold_nkeyframes: null
+tracking:
+  num_iterations: 10
+  method: gsaligner
+  keyframe_threshold_distance: 5.0
+  keyframe_threshold_nframes: -1
+  keyframe_threshold_fitness: 0.30
+  gsaligner: null
+opt:
+  position_lr: 0.0005
+  opacity_lr: 0.05
+  scaling_lr: 0.005
+  rotation_lr: 0.001
+  depth_ratio: 0.0
+device: cuda:0
