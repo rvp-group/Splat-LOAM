@@ -16,6 +16,10 @@
   
 [![arXiv](https://img.shields.io/badge/arXiv-2503.17491-b31b1b.svg)](https://arxiv.org/abs/2503.17491)
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6aee97f1-ea4a-4b56-bc50-50bae9e7d6c5"/>
+</p>
+
 # Quickstart
 ## Installation
 ### Prerequisites
