@@ -1550,7 +1550,7 @@ packages:
 - pypi: ./submodules/gsaligner
   name: gsaligner
   version: 0.0.1
-  sha256: 0e884a02cf78704dd64a30c785c442bcbc3c1ae7b8dc85dc65225216fe482e3f
+  sha256: b2f144082d39babb8681fff4ed2ec981034c8f24f58ee73dc8d008e14a9b7f4b
 - conda: https://prefix.dev/conda-forge/linux-64/gxx-13.3.0-h9576a4e_2.conda
   sha256: fa9d0171c17e4c4203a4199fcc35571a25c1f16c0ad992080d4f0ced53bf5aa5
   md5: 07e8df00b7cd3084ad3ef598ce32a71c
