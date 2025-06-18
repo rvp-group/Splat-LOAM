@@ -1,0 +1,27 @@
+name: Splat-LOAM
+channels:
+  - pyg
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - python=3.11
+  - pytorch=2.5.1
+  - pytorch-cuda=12.1
+  - torchvision=0.20.1
+  - eigen>=3.4.0,<4
+  - pip:
+    # PyPI package
+    - "omegaconf>=2.3.0,<3"
+    - "pytransform3d>=3.14.0,<4"
+    - "open3d==0.19"
+    - "rosbags>=0.10.9,<0.11"
+    - "natsort>=8.4.0,<9"
+    - "typer>=0.15.3,<0.16"
+    - "pyprojections>=0.0.3,<0.0.4"
+    - "setuptools"
+    - "evo>=1.31.1,<2"
+    - "plyfile>=1.1.2,<2"
+    - "rerun-sdk>=0.23.3,<0.24"
