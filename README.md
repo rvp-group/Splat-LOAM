@@ -33,8 +33,9 @@ To run Splat-LOAM, you strictly need an NVIDIA GPU with CUDA capabilities.
 The implementation has been tested with CUDA versions `11.8` and `12.6`, however, other versions should be compatible
 
 Moreover, depending on how you intend to run the implementation, you might need:
-- **Docker** and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 
+- **Docker** and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 - [Pixi](https://pixi.sh/latest/installation/)
+- [Anaconda](https://www.anaconda.com/download)
 
 ### 1. Recommended (Docker)
 The Docker configuration can be used both for execution and for development and its definitely the less-painful way to setup your machine.
@@ -68,6 +69,16 @@ Once the environment is setup, we suggest starting a shell in the Pixi environme
 ```sh
 pixi shell
 ```
+
+### 3. Anaconda
+Thanks to [@KwanWaiPang](https://github.com/KwanWaiPang) for the contribution!
+Create a new environment from the environment file and activate it:
+
+```sh
+conda env create -f environment.yaml
+conda activate Splat-LOAM
+```
+
 ## Run Splat-LOAM
 The main entrypoint for Splat-LOAM is the `run.py` script. It provides the following commands:
 * `slam`: Run SLAM mode from a dataset
