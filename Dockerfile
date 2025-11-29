@@ -1,6 +1,6 @@
 FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-devel AS builder
 
-ENV TORCH_CUDA_ARCH_LIST="8.6 8.9+PTX"
+ENV TORCH_CUDA_ARCH_LIST="7.5 8.6 8.9+PTX"
 
 RUN apt update && apt install -y \
   git \
@@ -30,8 +30,8 @@ RUN apt update && apt install --no-install-recommends -y \
   libgomp1 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install rosbags typer[all] omegaconf matplotlib pytransform3d \
-    plyfile natsort open3d==0.19.0 rerun-sdk evo
+RUN pip install rosbags==0.10.9 typer[all] omegaconf matplotlib pytransform3d \
+    plyfile natsort open3d==0.19.0 rerun-sdk==0.23.3 evo
 
 RUN chmod -R 777 /workspace
 USER $UNAME
